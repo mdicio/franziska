@@ -36,6 +36,8 @@ class Step(BaseModel):
                                      "their own words for dates, times, amounts, names and conditions")
     uses_previous: bool = Field(False, description="true when this step needs what the earlier steps found (an "
                                                    "amount, a date, a price, a list)")
+    acts: bool = Field(False, description="true when this step asks the assistant to save, change, delete or remind "
+                                          "something, even only under a condition")
 
 
 class Plan(BaseModel):
@@ -53,6 +55,7 @@ your request, so each request must be complete.
   'giovedì prossimo'), amounts, names and conditions ('se costa meno di 25 euro, ...'). Don't resolve or invent
   anything.
 - uses_previous: true when the step needs what an earlier step found.
+- acts: true when the step asks for a change (save, move, delete, remind), even under a condition.
 - A web request contains only words from the user's message: nothing about the user that the message doesn't say.
 - When the message refers to something sent earlier in the chat ('questo documento', 'il file'), name it in each
   request that needs it, by its number ('il documento #14'). A document already sent is in the library: reading,
@@ -78,7 +81,8 @@ def checked(plan: Plan, allowed: set[str]) -> list[Step]:
         if s.assistant in steps:
             first = steps.pop(s.assistant) if s.uses_previous else steps[s.assistant]
             steps[s.assistant] = first.model_copy(update={"request": f"{first.request}\n{s.request}",
-                                                         "uses_previous": first.uses_previous or s.uses_previous})
+                                                         "uses_previous": first.uses_previous or s.uses_previous,
+                                                         "acts": first.acts or s.acts})
         else:
             steps[s.assistant] = s
     out = list(steps.values())[:MAX_STEPS]

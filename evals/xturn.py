@@ -90,10 +90,12 @@ STEPS: list[Step] = [
     say("mon 16:00", "segna quella bolletta della luce tra le cose da pagare", "life", bill("acme|luce", 8420),
         known="life on Claude can't see money's bill past the follow-up window: privacy table, accepted 2026-11-12"),
     # money filters by merchant, not by the whole category (146 of 268 € in food & drink)
-    say("tue 10:00", "quanto ho speso al supermercato a ottobre?", "money", reply(r"146")),
+    say("tue 10:00", "quanto ho speso al supermercato a ottobre?", "money", reply(r"146"),
+        known="model: sums the category though TX_VIEW_DOC names merchant and says to filter it with LIKE"),
     # life carries money's figure into the task (146, or the 268 money may have said)
     say("tue 10:02", "ok, ricordami venerdì di rivedere il budget per quella cifra", "life",
-        task_has("budget", r"146|268")),
+        task_has("budget", r"146|268"),
+        known="model: the thread shows money's figure as the turn just before; the local model leaves it out"),
     # a plan: a life step, a money step, and a life step that needs money's result (122 € > 100)
     say("wed 09:00", "sposta il task 'comprare il pane' a domani, e quanto ho speso in ristoranti a ottobre? se più "
         "di 100 euro ricordami sabato di cucinare di più", None,

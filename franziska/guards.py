@@ -214,6 +214,9 @@ class Guard(AbstractCapability):
         self.pending: Callable[[], list] | None = None
         self.claimed: Callable[[str, list[str]], Awaitable[list[str]]] | None = None
         self._claims_checked = False
+        # Set for a planner step that asks for a change (plan.Step.acts): whether a reply says something is saved or
+        # will be (an AnyJev decision), asked only when the run wrote nothing and made no button.
+        self.promised: Callable[[str], Awaitable[bool]] | None = None
         self._search_asked = False
         self.calls: list[Call] = []
         self.reason = ""
@@ -327,13 +330,15 @@ class Guard(AbstractCapability):
                 day = self.now.date() + timedelta(days=(want - self.now.weekday()) % 7 or 7)
                 raise self._retry(f"weekday: {name} {value:%Y-%m-%d}",
                                   f"{name} {value:%Y-%m-%d} is a {value:%A}, but the user said {day:%A}: the next "
-                                  f"{day:%A} is {day:%Y-%m-%d}. Call again with the day they meant.")
+                                  f"{day:%A} is {day:%Y-%m-%d}. Call again with the day they meant (the same "
+                                  "arguments again if this call is for another day the message names, like tomorrow).")
 
     # ---- reply check -----------------------------------------------------------------------------
     async def after_output_process(self, ctx, *, output_context, output):
         if not isinstance(output, str):
             return output
         await self._check_claims(output)
+        await self._check_promise(output)
         if not self.checks:
             return output
         grounded = any(c.ok and c.name not in MEMORY_TOOLS for c in self.calls)
@@ -376,6 +381,22 @@ class Guard(AbstractCapability):
                 f"Your reply says this was done, but it was not: {'; '.join(said)}. It waits for the user to tap its "
                 "button under your reply. Rewrite the reply: say it is ready and they confirm it with the button. "
                 "Don't call any tool.")
+
+    async def _check_promise(self, output: str) -> None:
+        """Once per run: a step asked to save something, nothing was written or proposed, and the reply says it was
+        or will be ('ti ricorderò di cucinare di più sabato' with no add_task, xturn 2026-11-12). Sent back to do it
+        or say it isn't done. No model call when the step wrote, made a button, or wasn't asked for a change."""
+        promised, self.promised = self.promised, None  # once
+        if (not promised or any(c.ok and c.name in WRITES for c in self.calls)
+                or (self.pending and self.pending())):
+            return
+        if await promised(output):
+            obs.event("guard.promise", reply=output[:500])
+            raise self._retry(
+                "promised, not saved",
+                "Your reply says something is saved or will be, but no tool in this turn saved it. If the request asks "
+                "for it, call the tool now. If not (a condition isn't met, a detail is missing), rewrite the reply to "
+                "say plainly that nothing was saved and why.")
 
     def evidence(self) -> str:
         return "\n".join([self.text, f"{self.now:%Y-%m-%d %H:%M}", self.earlier,

@@ -88,6 +88,13 @@ AUTHORIZE_P = 0.8
 # A reply that says a write is done while it waits for a tap is sent back once (guards.Guard._check_claims).
 CLAIM_Q = "Does the reply tell the user this is already done (saved, set, added), rather than waiting for them to confirm?"
 CLAIM_P = 0.5
+# A planner step asked for a change, wrote nothing, made no button: does its reply say it did? (Guard._check_promise)
+# Measured on the live 26B (2026-11-12): 'ti ricorderò … sabato', 'ok, ti ricordo il 17', "I'll remind you" p≥0.98;
+# 'mi servono importo e scadenza', 'meno di 100 €: nessun promemoria', 'appuntamento o promemoria?', 'non trovo la
+# bolletta', a plain agenda answer p≤0.02. A looser wording ('…or that it will be…') said yes to all of those.
+PROMISE_Q = ("Does the reply tell the user, without any condition or question, that something is saved or will be done "
+             "for them?")
+PROMISE_P = 0.5
 # A note that is a lasting fact about the user also gets a 💾 profile button (Core._profile_offers).
 # Measured on the live 26B (2026-10-31): vegetarian, an allergy, the address p=1.00; a gate code, a friend's shoe
 # size, a budget, lab values, the passport's drawer p=0.00 (a looser wording said yes to all of those).
@@ -471,7 +478,8 @@ class Core:
             if not steps:
                 log.info("plan: fewer than two steps (%s): the normal turn answers", made.output)
                 return None
-            log.info("plan: %s", " → ".join(f"{s.assistant}{'*' if s.uses_previous else ''}" for s in steps))
+            log.info("plan: %s", " → ".join(f"{s.assistant}{'*' if s.uses_previous else ''}{'!' if s.acts else ''}"
+                                            for s in steps))
             results: list[delegation.StepResult] = []
             for step in steps:
                 where = self.models.where(self.models.for_route(step.assistant))
@@ -488,7 +496,7 @@ class Core:
                 results.append(await self.delegate(step.assistant, request,
                                                    tainted=used and any(r.tainted for r in seen), said=text,
                                                    context=self._thread(chat_id, state, step.assistant, where,
-                                                                        history=False), local=local))
+                                                                        history=False), local=local, acts=step.acts))
                 if results[-1].stopped == "busy":
                     break
         reply = "\n\n".join(f"{self.labels[r.route]} · {r.text}" for r in results)
@@ -808,12 +816,13 @@ class Core:
                      steps=_steps(result.new_messages()))
 
     async def delegate(self, route: str, request: str, tainted: bool = False, said: str = "",
-                       context: str = "", local: bool = False) -> delegation.StepResult:
+                       context: str = "", local: bool = False, acts: bool = False) -> delegation.StepResult:
         """One assistant on one complete request from another (delegation.py): no conversation history, its own usage
         limit, and read-only: its writes come back as proposals, except those the user's own message (`said`) asked
         for (_authorizer). `tainted`: the asking run had read untrusted content. `context`: the chat's thread, for a
         planner's step (an `ask` writes its request complete instead). `local`: on the local model whatever the
-        route's setting. The caller logs it, under its own turn."""
+        route's setting. `acts`: the planner says it asks for a change (Guard._check_promise). The caller logs it, under
+        its own turn."""
         started = clock.time()
         step = delegation.StepResult(route, request, "")
         agent, deps, model, where = await self._agent(route, request, local=local)
@@ -822,6 +831,7 @@ class Core:
         guard = guards.Guard(request, self.life.now(), checks=guards.CHECKS.get(route, ()), tainted=True,
                              defer=self._defer(route, deps), authorize=self._authorizer(said))
         guard.pending, guard.claimed = (lambda: view.proposals + guard.deferred), self._claimer()
+        guard.promised = self._promiser() if acts else None
         with obs.span(f"ask {route}", route, route=route, request=request[:200]):
             try:
                 result = await agent.run(
@@ -1035,6 +1045,23 @@ class Core:
                 return []
             return [label for i, label in enumerate(labels) if d[f"a{i}"].p_true >= CLAIM_P]
         return claimed
+
+    def _promiser(self) -> Callable[[str], Awaitable[bool]] | None:
+        """Whether a reply says something is saved or will be (Guard._check_promise): one AnyJev yes/no."""
+        if not self.router:
+            return None
+
+        async def promised(reply: str) -> bool:
+            from anyjev import Question
+
+            try:
+                d = await asyncio.to_thread(self.router.decide, f"The assistant's reply to the user:\n{reply[:3000]}",
+                                            [Question.noul(PROMISE_Q, name="p")])
+            except Exception:
+                log.exception("promise check failed: the reply goes as it is")
+                return False
+            return d["p"].p_true >= PROMISE_P
+        return promised
 
     def _defer(self, route: str, deps) -> Callable[[str, dict], workflows.Proposal | None]:
         """How a tainted run's write becomes a button (guards.Guard): the same tool, run on the tap without the model.
