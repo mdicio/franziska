@@ -85,6 +85,9 @@ MIGRATIONS = {
 }
 
 
+NOTES_SHOWN = 160  # characters of a task's notes in a list line (Task.listed)
+
+
 @dataclass(frozen=True)
 class Task:
     id: int
@@ -156,6 +159,12 @@ class Task:
         if self.done_at:
             bits.append("done")
         return " · ".join(bits)
+
+    def listed(self) -> str:
+        """The line with its notes, for the lists (open tasks, agenda): what the user or the agent wrote there is
+        otherwise never shown again ('che importo c'è nel promemoria?' → 'nessuno', simuser 2026-11-12)."""
+        notes = " ".join((self.notes or "").split())
+        return self.line() + (f" · notes: {notes[:NOTES_SHOWN]}{'…' if len(notes) > NOTES_SHOWN else ''}" if notes else "")
 
 
 def next_nag(now: datetime, priority: str, target: str | None = None, at: time = DAY_START) -> datetime:

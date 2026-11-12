@@ -209,7 +209,7 @@ class Life:
         out = []
         for pri, label in (("high", "🔴 High priority:"), ("normal", "Open tasks:"), ("low", "⚪ Low priority:")):
             if group := [t for t in tasks if t.priority == pri]:
-                out += [label] + [f"  {t.line()}{' · OVERDUE' if t.due_end and t.due_end < now else ''}"
+                out += [label] + [f"  {t.listed()}{' · OVERDUE' if t.due_end and t.due_end < now else ''}"
                                   for t in group]
         return out
 
@@ -243,12 +243,12 @@ class Life:
         out = []
         overdue = [t for t in open_tasks if t.due_at and t.due_end < iso(now)]
         if overdue and day0.date() <= now.date():
-            out += ["Overdue:"] + [f"  {t.line()}" for t in overdue]
+            out += ["Overdue:"] + [f"  {t.listed()}" for t in overdue]
         out += self._by_day(day0, end)
         # Undated tasks, and tasks whose reminder already went off without a deadline: still open, not overdue.
         other = [t for t in open_tasks if t not in overdue and not (t.when and t.when >= iso(now))]
         if other:
-            out += ["Other open tasks:"] + [f"  {t.line()}" for t in other]
+            out += ["Other open tasks:"] + [f"  {t.listed()}" for t in other]
         if self.calendar and (synced := self.calendar.synced_at()) and synced < iso(now - timedelta(hours=1)):
             out.append(f"(Google Calendar last synced {synced.replace('T', ' ')}; it may be out of date.)")
         last = end - timedelta(days=1)
@@ -268,7 +268,8 @@ class Life:
         """Appointments and dated open tasks in [day0, end), as 'Monday 26 Oct:' headings with indented lines."""
         by_day: dict[str, list[str]] = {}
         for t in self.upcoming(day0, end):
-            by_day.setdefault(datetime.fromisoformat(t.when).strftime("%A %d %b"), []).append(f"  {t.line()}")
+            by_day.setdefault(datetime.fromisoformat(t.when).strftime("%A %d %b"), []).append(
+                f"  {t.listed() if isinstance(t, Task) else t.line()}")
         return [ln for day, lines in by_day.items() for ln in (f"{day}:", *lines)]
 
     def brief(self) -> str:

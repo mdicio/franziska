@@ -111,8 +111,8 @@ STEPS: list[Step] = [
 
 def seed(world: week.World) -> None:
     """October's food & drink (146 € at the supermarket, 122 € in restaurants) and the task the plan moves."""
-    spent = [("SUPERMERCATO ESSELLUNGA", 5840, 3), ("SUPERMERCATO ESSELLUNGA", 4210, 12),
-             ("SUPERMERCATO ESSELLUNGA", 4550, 24), ("TRATTORIA DA PINO", 7000, 10), ("PIZZERIA VESUVIO", 5200, 18)]
+    spent = [("SUPERMERCATO ESSELUNGA", 5840, 3), ("SUPERMERCATO ESSELUNGA", 4210, 12),
+             ("SUPERMERCATO ESSELUNGA", 4550, 24), ("TRATTORIA DA PINO", 7000, 10), ("PIZZERIA VESUVIO", 5200, 18)]
     with world.bot.money._con() as con:
         ledger.insert(con, [ledger.Transaction("intesa", date(2026, 10, day), None, -cents,
                                                f"Pagamento POS {who} MILANO", "", "eval seed",

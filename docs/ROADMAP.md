@@ -26,8 +26,11 @@ What real use shows is failing: references across turns and routes (an earlier c
    merged plan step that needs earlier results runs after them. Accepted: on Claude, a reference to money or mail
    data past the 15-minute follow-up window finds nothing (the privacy table decides; relax it in `FRANZISKA_SEES`
    or keep that route local). Measured by `evals/xturn.py`.
-2. **Measure with a simulated user**: a stronger model plays you; judge on state. Add every real miss. The first
-   cases are `evals/xturn.py`.
+2. **Measure with a simulated user**: a stronger model plays you; judge on state. Add every real miss. First cut
+   2026-11-12: `evals/simuser.py`, Claude on the subscription plays the user through scenarios (phases with a goal
+   and what the user knows), on invented data; judged on the stores, its own verdict kept as a signal. The first
+   scenarios are xturn's; real-miss ones go in the private overlay. Next: count the writes the user had to undo (a
+   wrong write the user cleans up still ends in the right state), and more scenarios.
 3. **Typed money answers and delegation**: `check_payment`, then life ↔ money asks, the full planner.
 4. **Real-data checks of what exists**: the library on real documents, `run_python` and coding jobs for a week, a week
    of market reports.
