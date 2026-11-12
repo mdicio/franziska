@@ -1,0 +1,43 @@
+// Every store in the data dir, its owner and its readers. Render: docs/diagrams/render.sh
+digraph stores {
+  graph [rankdir=LR, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.15, ranksep=0.9,
+         label="Data: ~/.local/share/franziska (FRANZISKA_DATA_DIR) · SQLite in WAL mode · nightly backup", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.06"];
+  edge  [fontname="Noto Sans", fontsize=9, color="#90A4AE", arrowsize=0.6, penwidth=1.0];
+
+  subgraph cluster_owners {
+    label="Owner (the only writer of its rules)"; style="rounded,filled"; fillcolor="#F7F9FA"; color="#B0BEC5"; fontsize=13;
+    node [fillcolor="#ECEFF1", color="#546E7A"];
+    o_life [label="Life · NoteStore ·\nCalendar · MailStore"]; o_money [label="Money · Portfolio"]; o_turns [label="TurnLog · Conversations"];
+    o_mem [label="MemoryStore"]; o_lib [label="Library · DocCache"]; o_mkt [label="Market"]; o_obs [label="obs (traces)"];
+    o_misc [label="Events · Health · Usage ·\nhousekeeping · catchup"]; o_code [label="code.Jobs"];
+  }
+
+  subgraph cluster_files {
+    label="Files"; style="rounded,filled"; fillcolor="#FFFFFF"; color="#78909C"; fontsize=13;
+    node [shape=cylinder, fillcolor="#FFFFFF", color="#37474F", fontsize=10];
+    f_life [label="life.sqlite\ntasks · undo · reminder_rules · notes(+fts)\ncalendar_events · calendar_sync · mail"];
+    f_ledger [label="ledger.sqlite\ntransactions · payees · budgets · bills ·\nbalances · links · inv_* tables"];
+    f_turns [label="turns.sqlite\nturns(+fts, vectors) · digests ·\nconversations · marks"];
+    f_mem [label="memory/<scope>/<name>.md\ninstructions/<agent>.md"];
+    f_lib [label="library.sqlite + library/files/\ncache/docs/"];
+    f_mkt [label="market.sqlite\nprices · items · events · reports\n+ reports/*.pdf"];
+    f_obs [label="traces.sqlite (30 days,\nnot backed up)"];
+    f_misc [label="events · health · usage ·\nmaintenance · jobs .sqlite"];
+    f_code [label="code/code.sqlite\n+ jobs/<id>/ clones"];
+  }
+
+  subgraph cluster_readers {
+    label="Who else may open it"; style="rounded,filled"; fillcolor="#FFF8F8"; color="#EF9A9A"; fontsize=13;
+    node [fillcolor="#FFFFFF", color="#E53935"];
+    r_mcp [label="MCP server (cloud clients)\nlife.sqlite + market reports only"];
+    r_web [label="web UI Data view · Datasette /sql/\nread-only (mode=ro)"];
+    r_backup [label="backup.py: every *.sqlite but traces\n+ memory/, one dated folder a night"];
+  }
+
+  o_life -> f_life; o_money -> f_ledger; o_turns -> f_turns; o_mem -> f_mem; o_lib -> f_lib; o_mkt -> f_mkt;
+  o_obs -> f_obs; o_misc -> f_misc; o_code -> f_code;
+  f_life -> r_mcp [color="#E53935"]; f_mkt -> r_mcp [color="#E53935"];
+  f_ledger -> r_web; f_turns -> r_web; f_obs -> r_web;
+  f_mem -> r_backup; f_life -> r_backup; f_ledger -> r_backup;
+}

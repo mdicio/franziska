@@ -1,0 +1,44 @@
+// The document library (library.py, documents.py, doccache.py). Render: docs/diagrams/render.sh
+digraph library {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.25, ranksep=0.45,
+         label="Document library: ingest once, search by words and meaning, filtered by privacy", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  subgraph cluster_in {
+    label="Comes in"; style="rounded,filled"; fillcolor="#F5F9FF"; color="#90CAF9"; fontsize=13;
+    tg [label="file sent on Telegram\nor the web UI", fillcolor="#E3F2FD", color="#1E88E5"];
+    att [label="mail attachment read\n(read_attachment,\nindex_attachments, mail_bills)", fillcolor="#E3F2FD", color="#1E88E5"];
+    page [label="web page the user\nasks to keep (keep_page)", fillcolor="#E3F2FD", color="#1E88E5"];
+  }
+
+  text [label="documents.text_of (cheapest first)\n1 pdftotext text layer\n2 OCR: pdftoppm + tesseract ita+eng (CPU)\n.eml/PEC stdlib · .docx zip+XML · .xlsx openpyxl", fillcolor="#ECEFF1", color="#546E7A"];
+  cache [label="doc cache\ncache/docs/<key>.txt\n90 days, 200 MB", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+  add [label="Library.add\nsha256 of text = identity\nprivacy class = route it came in on", fillcolor="#ECEFF1", color="#546E7A"];
+  split [label="pages (PDF form feeds, else 4000-char parts)\n→ chunks ~400 tokens, 15% overlap,\nnever across a page, heading carried", fillcolor="#ECEFF1", color="#546E7A"];
+  card [label="describe (background)\nlocal model: what it is + 5–8 search\nwords, appended to the title", fillcolor="#EDE7F6", color="#5E35B1"];
+
+  db [label="library.sqlite\ndocuments · pages · chunks ·\nchunks_fts (FTS5) · vectors (BLOB)", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+  orig [label="library/files/<sha256>\noriginal file (≤25 MB)", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+  emb [label="embed job (every 2 min, chat quiet)\nEmbeddingGemma-300M on :8081 (CPU)\n'title › heading' + chunk text", fillcolor="#FBE9E7", color="#F4511E"];
+
+  subgraph cluster_search {
+    label="search_documents(query) on route R"; style="rounded,filled"; fillcolor="#F4FBF4"; color="#A5D6A7"; fontsize=13;
+    w [label="words: FTS5 BM25\nquery minus stop words\ntop 30", fillcolor="#ECEFF1", color="#546E7A"];
+    m [label="meaning: query vector ·\nevery chunk (numpy)\ntop 30, below floor dropped", fillcolor="#ECEFF1", color="#546E7A"];
+    rrf [label="Reciprocal Rank Fusion\nk = 60, words × 0.5", fillcolor="#ECEFF1", color="#546E7A"];
+    rr [label="reranker (optional,\nFRANZISKA_RERANK_URL, off)", fillcolor="#ECEFF1", color="#546E7A", style="rounded,filled,dashed"];
+    cap [label="≤3 passages per document,\nadjacent hits merged,\n5 passages with doc #, page", fillcolor="#ECEFF1", color="#546E7A"];
+    priv [label="WHERE privacy IN\nprivacy.SEES[R]", fillcolor="#FFEBEE", color="#E53935"];
+    {rank=same; priv; w; m; rrf; rr; cap}
+    w -> rrf; m -> rrf; rrf -> rr -> cap;
+  }
+  out [label="UNTRUSTED result:\nthe run is tainted,\nwrites become buttons", fillcolor="#FFEBEE", color="#E53935"];
+
+  tg -> text; att -> text; page -> add; text -> cache [dir=both, style=dashed]; text -> add;
+  add -> split -> db; add -> orig; add -> card [style=dashed]; card -> db [style=dashed, label=" title"];
+  db -> emb [dir=both, style=dashed, label=" fill vectors"];
+  priv -> w [lhead=cluster_search, style=dashed]; db -> w; db -> m; cap -> out;
+  {rank=same; text; add; split; db; emb}
+  {rank=same; cache; card; orig}
+}

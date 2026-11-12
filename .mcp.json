@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "life": {
+      "command": "uv",
+      "args": ["run", "--quiet", "python", "-m", "franziska.mcp_server"]
+    }
+  }
+}

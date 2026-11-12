@@ -1,0 +1,28 @@
+# systemd user service for the document library's embedding model (franziska/library.py, DESIGN decision 39):
+# llama.cpp's llama-server with EmbeddingGemma-300M on the CPU only, so it never takes VRAM from the 26B (the 3060 is
+# full) nor the GPU lock. Chosen by evals/library.py (2026-10-31): the same recall as Qwen3-Embedding-0.6B on the
+# synthetic corpus at a quarter of the time (25 ms a query, ~3 s to embed five documents) and half the RAM. Install:
+#   cp deploy/franziska-embed.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now franziska-embed
+#   then FRANZISKA_EMBED_URL=http://127.0.0.1:8081 in .env and restart the bot and the web UI
+# Logs: journalctl --user -u franziska-embed -f
+# 4 threads of 12: the bot embeds when the chat is quiet, and a query in a turn is one short input.
+# Download: curl -L -o ~/models/gguf/embeddinggemma-300M-Q8_0.gguf \
+#   https://huggingface.co/ggml-org/embeddinggemma-300M-GGUF/resolve/main/embeddinggemma-300M-Q8_0.gguf
+# A reranker (bge-reranker-v2-m3) is supported (FRANZISKA_RERANK_URL) but off: +0.2 recall@1 on the synthetic set,
+# 6.5 s a query on the CPU. To try it, a copy of this unit with that model, `--reranking` and port 8082.
+[Unit]
+Description=Embedding server for the document library (llama-server, EmbeddingGemma-300M, CPU)
+
+[Service]
+Environment=LLAMA=%h/.local/opt/llama.cpp/llama-b11936
+Environment=LD_LIBRARY_PATH=%h/.local/opt/llama.cpp/llama-b11936:%h/.local/opt/llama.cpp/cudart-llama-b11936-bin-ubuntu-cuda-12.8-x64
+Environment=CUDA_VISIBLE_DEVICES=
+ExecStart=/bin/sh -c 'exec "$LLAMA/llama-server" -m %h/models/gguf/embeddinggemma-300M-Q8_0.gguf \
+  --host 127.0.0.1 --port 8081 -ngl 0 --embedding -c 8192 -b 2048 -ub 2048 -t 4'
+Nice=10
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

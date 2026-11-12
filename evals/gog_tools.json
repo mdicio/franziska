@@ -1,0 +1,480 @@
+[
+ {
+  "name": "gmail_archive_messages",
+  "description": "Archive explicit Gmail messages by removing INBOX.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "message_ids": {
+     "description": "Explicit Gmail message IDs (1\u20131000)",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 1000,
+     "minItems": 1,
+     "type": "array"
+    }
+   },
+   "required": [
+    "message_ids"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_create_draft",
+  "description": "Create a Gmail draft from literal text or HTML; no local files are read.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "bcc": {
+     "description": "Comma-separated Bcc recipients; omitted Bcc is cleared on update",
+     "type": "string"
+    },
+    "body": {
+     "description": "Literal plain text body; body or body_html is required",
+     "type": "string"
+    },
+    "body_html": {
+     "description": "Literal HTML body; body or body_html is required",
+     "type": "string"
+    },
+    "cc": {
+     "description": "Comma-separated Cc recipients; omitted Cc is cleared on update",
+     "type": "string"
+    },
+    "from": {
+     "description": "Optional verified send-as alias",
+     "type": "string"
+    },
+    "quote": {
+     "description": "Include the original message in the reply body",
+     "type": "boolean"
+    },
+    "reply_all": {
+     "description": "Resolve recipients from the reply target",
+     "type": "boolean"
+    },
+    "reply_to": {
+     "description": "Reply-To header address",
+     "type": "string"
+    },
+    "reply_to_message_id": {
+     "description": "Reply target Gmail message ID; mutually exclusive with thread_id",
+     "type": "string"
+    },
+    "subject": {
+     "description": "Message subject",
+     "type": "string"
+    },
+    "thread_id": {
+     "description": "Reply target Gmail thread ID; mutually exclusive with reply_to_message_id",
+     "type": "string"
+    },
+    "to": {
+     "description": "Comma-separated recipients; optional for a draft. On update, omit to keep To or pass an empty string to clear it.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "subject"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_create_label",
+  "description": "Create a Gmail label.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "description": "New label name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_get_draft",
+  "description": "Read one Gmail draft, including its MIME payload, without downloading attachments.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "draft_id": {
+     "description": "Gmail draft ID",
+     "type": "string"
+    }
+   },
+   "required": [
+    "draft_id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_get_message",
+  "description": "Get one Gmail message by ID. Sanitized content is enabled by default.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "message_id": {
+     "description": "Gmail message ID",
+     "type": "string"
+    },
+    "sanitize_content": {
+     "default": true,
+     "description": "Strip URLs/HTML and omit raw payloads",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "message_id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_get_thread",
+  "description": "Get one Gmail thread by ID. Sanitized content is enabled by default.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "full": {
+     "default": false,
+     "description": "Include full message bodies",
+     "type": "boolean"
+    },
+    "sanitize_content": {
+     "default": true,
+     "description": "Strip URLs/HTML and omit raw payloads",
+     "type": "boolean"
+    },
+    "thread_id": {
+     "description": "Gmail thread ID",
+     "type": "string"
+    }
+   },
+   "required": [
+    "thread_id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_list_drafts",
+  "description": "List Gmail draft IDs and their message/thread IDs, one bounded page at a time.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "max": {
+     "default": 20,
+     "description": "Maximum results",
+     "maximum": 100,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "page": {
+     "description": "Page token returned by a previous call",
+     "type": "string"
+    }
+   },
+   "required": [],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_list_labels",
+  "description": "List Gmail labels and their case-sensitive IDs.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {},
+   "required": [],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_mark_read",
+  "description": "Mark explicit Gmail messages as read.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "message_ids": {
+     "description": "Explicit Gmail message IDs (1\u20131000)",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 1000,
+     "minItems": 1,
+     "type": "array"
+    }
+   },
+   "required": [
+    "message_ids"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_mark_unread",
+  "description": "Mark explicit Gmail messages as unread.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "message_ids": {
+     "description": "Explicit Gmail message IDs (1\u20131000)",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 1000,
+     "minItems": 1,
+     "type": "array"
+    }
+   },
+   "required": [
+    "message_ids"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_modify_messages",
+  "description": "Add or remove labels on explicit Gmail messages. Label IDs are case-sensitive; names use CLI label lookup.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "add_labels": {
+     "description": "Literal label names or case-sensitive IDs; commas and backslashes in each entry are preserved",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 100,
+     "type": "array"
+    },
+    "message_ids": {
+     "description": "Explicit Gmail message IDs (1\u20131000)",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 1000,
+     "minItems": 1,
+     "type": "array"
+    },
+    "remove_labels": {
+     "description": "Literal label names or case-sensitive IDs; commas and backslashes in each entry are preserved",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 100,
+     "type": "array"
+    }
+   },
+   "required": [
+    "message_ids"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_modify_thread",
+  "description": "Add or remove labels on every message in one Gmail thread. Label IDs are case-sensitive.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "add_labels": {
+     "description": "Literal label names or case-sensitive IDs; commas and backslashes in each entry are preserved",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 100,
+     "type": "array"
+    },
+    "remove_labels": {
+     "description": "Literal label names or case-sensitive IDs; commas and backslashes in each entry are preserved",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 100,
+     "type": "array"
+    },
+    "thread_id": {
+     "description": "Gmail thread ID",
+     "type": "string"
+    }
+   },
+   "required": [
+    "thread_id"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_restore_messages",
+  "description": "Remove TRASH from explicit Gmail messages. Does not add INBOX.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "message_ids": {
+     "description": "Explicit Gmail message IDs (1\u20131000)",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 1000,
+     "minItems": 1,
+     "type": "array"
+    }
+   },
+   "required": [
+    "message_ids"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_search",
+  "description": "Search Gmail messages with Gmail query syntax. Returns message summaries; message bodies are optional (include_body). Set headers for other header values such as List-Id or Sender. Set sanitize_content to get sanitized body and header text.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "headers": {
+     "description": "Header names, e.g. List-Id and Sender. Each result gets a headers object keyed by canonical name (list-id becomes List-Id, Message-ID becomes Message-Id); missing headers are empty and repeated ones give the first value",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 50,
+     "type": "array"
+    },
+    "include_body": {
+     "default": false,
+     "description": "Include decoded message body",
+     "type": "boolean"
+    },
+    "include_recipients": {
+     "default": false,
+     "description": "Include To, Cc, and Bcc headers",
+     "type": "boolean"
+    },
+    "max": {
+     "default": 10,
+     "description": "Maximum results",
+     "maximum": 100,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "query": {
+     "description": "Gmail search query, e.g. newer_than:7d from:person@example.com",
+     "type": "string"
+    },
+    "sanitize_content": {
+     "default": false,
+     "description": "Strip URLs/HTML from bodies and header text",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_trash_messages",
+  "description": "Move explicit Gmail messages to Trash, removing INBOX.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "message_ids": {
+     "description": "Explicit Gmail message IDs (1\u20131000)",
+     "items": {
+      "type": "string"
+     },
+     "maxItems": 1000,
+     "minItems": 1,
+     "type": "array"
+    }
+   },
+   "required": [
+    "message_ids"
+   ],
+   "type": "object"
+  }
+ },
+ {
+  "name": "gmail_update_draft",
+  "description": "Replace a Gmail draft's subject/body. Omitted To, attachments, and reply lineage are preserved; omitted Cc/Bcc are cleared. Supply body_html to retain HTML.",
+  "inputSchema": {
+   "additionalProperties": false,
+   "properties": {
+    "bcc": {
+     "description": "Comma-separated Bcc recipients; omitted Bcc is cleared on update",
+     "type": "string"
+    },
+    "body": {
+     "description": "Literal plain text body; body or body_html is required",
+     "type": "string"
+    },
+    "body_html": {
+     "description": "Literal HTML body; body or body_html is required",
+     "type": "string"
+    },
+    "cc": {
+     "description": "Comma-separated Cc recipients; omitted Cc is cleared on update",
+     "type": "string"
+    },
+    "clear_attachments": {
+     "description": "Remove existing draft attachments",
+     "type": "boolean"
+    },
+    "clear_reply_context": {
+     "description": "Remove existing reply headers; incompatible with reply targets and quote",
+     "type": "boolean"
+    },
+    "draft_id": {
+     "description": "Gmail draft ID",
+     "type": "string"
+    },
+    "from": {
+     "description": "Optional verified send-as alias",
+     "type": "string"
+    },
+    "quote": {
+     "description": "Include the original message in the reply body",
+     "type": "boolean"
+    },
+    "reply_all": {
+     "description": "Resolve recipients from the reply target",
+     "type": "boolean"
+    },
+    "reply_to": {
+     "description": "Reply-To header address",
+     "type": "string"
+    },
+    "reply_to_message_id": {
+     "description": "Reply target Gmail message ID; mutually exclusive with thread_id",
+     "type": "string"
+    },
+    "subject": {
+     "description": "Message subject",
+     "type": "string"
+    },
+    "thread_id": {
+     "description": "Reply target Gmail thread ID; mutually exclusive with reply_to_message_id",
+     "type": "string"
+    },
+    "to": {
+     "description": "Comma-separated recipients; optional for a draft. On update, omit to keep To or pass an empty string to clear it.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "subject",
+    "draft_id"
+   ],
+   "type": "object"
+  }
+ }
+]

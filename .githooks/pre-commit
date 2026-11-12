@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Refuses a commit that adds secrets or personal data. Enabled per clone with: git config core.hooksPath .githooks
+# Checks the added lines of the staged diff against:
+#   - secret shapes (Telegram bot token, Google OAuth secret/key, private keys, OpenAI/Anthropic keys)
+#   - Italian IBANs
+#   - ~/.config/franziska/denylist: your own identifiers, one case-insensitive regex per line (# comments).
+#     It stays outside the repo so the list itself is never committed.
+#   - fingerprints of your own data from the live stores (.githooks/leakscan.py): amounts, bills, ISINs, people.
+# And it refuses data files by name even if .gitignore was bypassed with `git add -f`.
+# Runs gitleaks too when it's installed. A false positive: fix the line, or `git commit --no-verify` once.
+set -euo pipefail
+
+DENYLIST="${FRANZISKA_DENYLIST:-$HOME/.config/franziska/denylist}"
+fail=0
+
+bad_files=$(git diff --cached --name-only --diff-filter=ACR |
+  grep -iE '(^|/)\.env$|\.(sqlite|db|xlsx|xls|csv|pdf|zip|ipynb|gguf|bak)$|client_secret.*\.json$|token.*\.json$' || true)
+if [[ -n "$bad_files" ]]; then
+  echo "pre-commit: data or secret files staged:" >&2
+  echo "$bad_files" | sed 's/^/  /' >&2
+  fail=1
+fi
+
+added=$(git diff --cached -U0 --diff-filter=ACMR --no-color | grep -E '^\+[^+]' || true)
+
+check() {  # check <label> <extended regex> [grep flags]
+  local hits
+  hits=$(grep -nE ${3:-} -- "$2" <<<"$added" || true)
+  if [[ -n "$hits" ]]; then
+    echo "pre-commit: $1:" >&2
+    echo "$hits" | cut -c1-160 | sed 's/^/  /' >&2
+    fail=1
+  fi
+}
+
+check "Telegram bot token" '[0-9]{8,10}:AA[A-Za-z0-9_-]{33}'
+check "Google OAuth secret or API key" 'GOCSPX-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|1//0[0-9A-Za-z_-]{30,}'
+check "private key" '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+check "API key" 'sk-(ant-|proj-)?[A-Za-z0-9_-]{20,}'
+check "IBAN" '\bIT[0-9]{2}[A-Z][0-9]{10}[0-9A-Z]{12}\b'
+
+if [[ -f "$DENYLIST" ]]; then
+  pattern=$(grep -vE '^\s*(#|$)' "$DENYLIST" | paste -sd'|' || true)
+  [[ -n "$pattern" ]] && check "personal identifier from $DENYLIST" "$pattern" -i
+else
+  echo "pre-commit: warning: no $DENYLIST, personal identifiers not checked" >&2
+fi
+
+# Fingerprints of your own data (amounts, balances, monthly totals, bills, ISINs, people), read from the live stores.
+# Same skips as `leakscan.py --tree`: drawing coordinates in SVGs and lockfile hashes look like amounts.
+scan_added=$(git diff --cached -U0 --diff-filter=ACMR --no-color -- . \
+  ':(exclude)*.svg' ':(exclude)*.lock' ':(exclude)*package-lock.json' ':(exclude)*/vendor/*' | grep -E '^\+[^+]' || true)
+if [[ -n "$scan_added" ]] && command -v python3 >/dev/null; then
+  leaks=$(sed 's/^+//' <<<"$scan_added" | python3 -I "$(git rev-parse --show-toplevel)/.githooks/leakscan.py" || true)
+  if [[ -n "$leaks" ]]; then
+    echo "pre-commit: figures or names from your own data (.githooks/leakscan.py):" >&2
+    echo "$leaks" | cut -c1-200 | sed 's/^/  /' >&2
+    fail=1
+  fi
+fi
+
+if command -v gitleaks >/dev/null; then
+  gitleaks git --staged --no-banner --redact || fail=1
+fi
+
+if (( fail )); then
+  echo "pre-commit: commit refused (see above)." >&2
+  exit 1
+fi

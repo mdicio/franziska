@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Franziska</title>
+<meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <nav class="nav" aria-label="Views">
+    <div class="brand"><span class="mark">F</span><span class="brand-name">Franziska</span></div>
+    <button class="find" id="find" type="button" title="Jump to a view, a table, a file or a workflow"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><span>Search</span><kbd>Ctrl K</kbd></button>
+    <a href="#chat" data-view="chat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span>Chat</span></a>
+    <a href="#today" data-view="today"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span>Today</span></a>
+    <a href="#money" data-view="money"><svg viewBox="0 0 24 24"><path d="M17 6.5A6.5 6.5 0 1 0 17 17.5M5 10.5h8M5 13.5h8"/></svg><span>Money</span></a>
+    <a href="#flows" data-view="flows"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M6.5 10v3a2 2 0 0 0 2 2H14"/></svg><span>Workflows</span></a>
+    <a href="#code" data-view="code"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg><span>Code</span></a>
+    <a href="#data" data-view="data"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/></svg><span>Data</span></a>
+    <a href="#memory" data-view="memory"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-4-5 4z"/></svg><span>Memory</span></a>
+    <a href="#settings" data-view="settings"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>Settings</span></a>
+    <a href="/world" title="The team as a 3D world"><svg viewBox="0 0 24 24"><path d="M3 18l6-9 4 6 3-4 5 7z"/><circle cx="17" cy="6" r="2"/></svg><span>World</span></a>
+    <div class="nav-tools">
+      <a href="/phoenix/" target="_blank" rel="noopener" id="tele" class="tool" title="Phoenix: every run's model calls and tool calls. Starts on the first click."><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg><span>Telemetry</span><i class="tdot"></i></a>
+      <a href="/sql/" target="_blank" rel="noopener" class="tool" title="Datasette: query every store with SQL, facets and filters"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14"/></svg><span>SQL</span></a>
+    </div>
+    <button class="desk" id="desk" type="button" title="The GPU desktop that runs the local model">
+      <span class="dot"></span><span class="desk-text">Desktop…</span>
+    </button>
+  </nav>
+
+  <main>
+    <section class="view" id="view-chat" aria-label="Chat">
+      <header class="bar">
+        <h1>Chat</h1>
+        <div class="modes" id="modes" role="radiogroup" aria-label="Who answers"></div>
+        <button class="ghost" id="new-chat" type="button" title="Forget the recent messages of every assistant. Tasks, notes and what I learned about you stay.">New chat</button>
+      </header>
+      <div class="chat-body">
+        <div class="log" id="log" aria-live="polite"></div>
+        <aside class="glance" id="glance" aria-label="Today at a glance"></aside>
+      </div>
+      <div class="ctx" id="ctx" title="Tokens the model holds after the last turn, of its window"></div>
+      <form class="composer" id="composer">
+        <div class="slash" id="slash" role="listbox" aria-label="Workflows"></div>
+        <button type="button" class="attach" id="attach" aria-label="Send a file" title="Send a file: a bank export is imported, anything else is read"><svg viewBox="0 0 24 24"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.2a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4"/></svg></button>
+        <input type="file" id="file" hidden>
+        <textarea id="input" rows="1" placeholder="Write to Franziska…" autocomplete="off" enterkeyhint="send"></textarea>
+        <button type="submit" id="send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
+      </form>
+    </section>
+
+    <section class="view" id="view-today" aria-label="Today">
+      <header class="bar"><h1 id="today-title">Today</h1>
+        <button class="ghost" id="undo" type="button">Undo last change</button></header>
+      <div class="page" id="today"></div>
+    </section>
+
+    <section class="view" id="view-money" aria-label="Money">
+      <header class="bar"><h1>Money</h1>
+        <div class="month-nav"><button class="ghost icon" id="prev" type="button" aria-label="Previous month">‹</button>
+          <span id="month"></span><button class="ghost icon" id="next" type="button" aria-label="Next month">›</button></div>
+      </header>
+      <div class="page" id="money"></div>
+    </section>
+
+    <section class="view" id="view-flows" aria-label="Workflows">
+      <header class="bar"><h1>Workflows</h1><small class="bar-note">Jobs that run end to end on the desktop's model. Writes wait for your tap.</small></header>
+      <div class="page" id="flows"></div>
+    </section>
+
+    <section class="view" id="view-code" aria-label="Coding jobs">
+      <header class="bar"><h1>Coding jobs</h1><small class="bar-note">An agent changes code in a sandbox with no network; you review the branch. Nothing merges, pushes or restarts until you tap.</small></header>
+      <div class="page" id="code"></div>
+    </section>
+
+    <section class="view" id="view-data" aria-label="Data">
+      <header class="bar"><h1 id="data-title">Data</h1>
+        <div class="data-tools" id="data-tools"><input id="dataq" type="search" placeholder="Search this table…"></div></header>
+      <div class="data" id="data">
+        <aside class="data-nav" aria-label="Stores and tables">
+          <input id="tableq" type="search" placeholder="Filter tables…" aria-label="Filter tables">
+          <div id="data-nav"></div>
+        </aside>
+        <div class="data-main" id="data-main"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-memory" aria-label="Memory">
+      <header class="bar"><h1>Memory</h1><input id="memq" type="search" placeholder="Filter…"></header>
+      <div class="page" id="memory"></div>
+    </section>
+    <section class="view" id="view-settings" aria-label="Settings">
+      <header class="bar"><h1>Settings</h1><small class="bar-note">What is running, and the choices behind it. Changes are saved at once and applied when you restart a service.</small></header>
+      <div class="page" id="settings"></div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<div class="palette" id="palette" hidden><div class="palette-card card" role="dialog" aria-label="Go to">
+  <input id="palq" type="search" placeholder="Go to a view, table, file, workflow…" autocomplete="off" aria-label="Go to">
+  <div class="palette-list" id="pal-list" role="listbox"></div>
+  <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> choose</span><span><kbd>Enter</kbd> open</span><span><kbd>Esc</kbd> close</span></div>
+</div></div>
+<div class="drop" id="drop" aria-hidden="true"><div><b>Drop to give it to Franziska</b>
+  <span>A bank or DEGIRO export is imported. A PDF, photo, .eml or .txt is read on your machines and an assistant says what to do about it. What you typed goes along as the request.</span></div></div>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

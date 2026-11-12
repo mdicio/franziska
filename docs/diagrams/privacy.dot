@@ -1,0 +1,38 @@
+// Who sees what (privacy.py): one table for documents, the turn log and the thread. Render: docs/diagrams/render.sh
+digraph privacy {
+  graph [rankdir=LR, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.3, ranksep=0.6,
+         label="Privacy classes: every route's data has one class; a run sees the classes SEES gives it", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=plaintext];
+
+  matrix [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="7" color="#B0BEC5">
+    <tr><td bgcolor="#ECEFF1"><b>route</b></td><td bgcolor="#ECEFF1"><b>its data is (HOLDS)</b></td>
+        <td bgcolor="#E3F2FD"><b>public</b></td><td bgcolor="#E8F5E9"><b>personal</b></td>
+        <td bgcolor="#FFF8E1"><b>mail</b></td><td bgcolor="#FFEBEE"><b>money</b></td></tr>
+    <tr><td align="left"><b>life</b></td><td>personal</td><td>✔</td><td>✔</td><td>✔</td><td> </td></tr>
+    <tr><td align="left"><b>mail</b></td><td>mail</td><td>✔</td><td>✔</td><td>✔</td><td> </td></tr>
+    <tr><td align="left"><b>money</b></td><td>money</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td></tr>
+    <tr><td align="left"><b>chat</b></td><td>personal</td><td>✔</td><td>✔</td><td> </td><td> </td></tr>
+    <tr><td align="left"><b>pc</b></td><td>personal</td><td>✔</td><td>✔</td><td> </td><td> </td></tr>
+    <tr><td align="left"><b>web</b></td><td>public</td><td>✔</td><td> </td><td> </td><td> </td></tr>
+    <tr><td align="left" colspan="6"><font point-size="10">SEES (rows) · override with FRANZISKA_SEES='chat=public,personal,money' · web stays public only<br/>workflows take their scope's class (mail_bills → mail) · the planner's own row is seen by nobody</font></td></tr>
+  </table>>];
+
+  limits [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="7" color="#E53935">
+    <tr><td bgcolor="#FFEBEE" colspan="2"><b>limits on top of the table: where the model runs</b></td></tr>
+    <tr><td align="left"><b>local</b> (llama-server)</td><td align="left">the table as is · plus the turn just before (≤15 min),<br/>whatever its class, so a follow-up works (FOLLOW_UP)</td></tr>
+    <tr><td align="left"><b>claude</b> (your plan)</td><td align="left">∩ {public, personal}: never money or mail,<br/>also not via a plan step's earlier results</td></tr>
+    <tr><td align="left"><b>cloud</b> (OpenRouter …)</td><td align="left">∩ CLOUD_SEES = nothing · no profile memory ·<br/>no run_python</td></tr>
+    <tr><td align="left"><b>MCP clients</b></td><td align="left">life.sqlite only (schedule, notes) + market reports;<br/>never the ledger, mail, turn log or memory files</td></tr>
+  </table>>];
+
+  where [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="7" color="#90A4AE">
+    <tr><td bgcolor="#ECEFF1"><b>applied in</b></td></tr>
+    <tr><td align="left">library search: a WHERE on documents.privacy</td></tr>
+    <tr><td align="left">past_conversations: only rows of visible routes</td></tr>
+    <tr><td align="left">Core._thread: lines of the chat's recent turns</td></tr>
+    <tr><td align="left">plan steps: earlier results passed on</td></tr>
+    <tr><td align="left">Core._callees: whom a Claude run may ask</td></tr>
+  </table>>];
+
+  matrix -> limits [color="#E53935", arrowsize=0.8]; limits -> where [color="#546E7A", arrowsize=0.8];
+}

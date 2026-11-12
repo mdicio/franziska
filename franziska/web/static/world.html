@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Franziska · World</title>
+<meta name="theme-color" content="#070b14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/world/world.css">
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three/three.module.min.js", "three/addons/": "/static/vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="scene" aria-label="Franziska's world: drag to look around, the team bar to travel"></canvas>
+<div id="tags" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="brand"><span class="orb"></span><div><div id="who">Franziska</div><div id="state">waking the world…</div></div></div>
+  <nav id="team" class="team" aria-label="The team"></nav>
+  <div class="tools">
+    <button id="wake" type="button" class="ghost wake" hidden title="Wake the GPU desktop that runs the local model">🖥️ Wake</button>
+    <button id="quality" type="button" class="ghost" title="Full or lite graphics">Full</button>
+    <a class="ghost" href="/" title="The classic view: lists, tables, the money reports">Classic</a>
+  </div>
+</header>
+
+<aside id="card" class="card glass" aria-live="polite"></aside>
+
+<section id="chat" class="chat glass" aria-label="Chat">
+  <button id="fold" type="button" class="fold" aria-expanded="false" aria-controls="log">
+    <span id="last" class="last"><span class="from">Franziska</span><span>Ask me anything.</span></span><span class="chev"></span>
+  </button>
+  <div id="log" class="log" aria-live="polite"></div>
+  <div id="live" class="live"></div>
+  <form id="composer" class="composer">
+    <div id="modes" class="modes" aria-label="Who answers"></div>
+    <div class="row">
+      <button id="attach" type="button" class="attach" aria-label="Send a file" title="Send a file: a bank export is imported, anything else is read"><svg viewBox="0 0 24 24"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.2a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4"/></svg></button>
+      <input id="file" type="file" hidden>
+      <textarea id="input" rows="1" placeholder="Talk to Franziska…" autocomplete="off" enterkeyhint="send"></textarea>
+      <button id="send" type="submit" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></button>
+    </div>
+  </form>
+</section>
+
+<div id="note" class="note glass" role="status"></div>
+<div id="drop" class="drop" aria-hidden="true"><div class="glass"><b>Drop to give it to Franziska</b>
+  <span>A bank or DEGIRO export is imported; anything else is read on your machines. What you typed goes along as the request.</span></div></div>
+<div class="hint">drag to look · right-drag or WASD to move · scroll to zoom · 1–9 to travel · H home</div>
+<div id="loading" class="loading"><span class="orb"></span>Waking the world…</div>
+<script type="module" src="/static/world/main.js"></script>
+</body>
+</html>

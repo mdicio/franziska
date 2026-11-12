@@ -1,0 +1,39 @@
+// The guard around every agent run (guards.py): tool calls and the final reply. Render: docs/diagrams/render.sh
+digraph guards {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.35, ranksep=0.35,
+         label="Guard: a pydantic-ai capability built per run", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  subgraph cluster_tool {
+    label="Each tool call"; style="rounded,filled"; fillcolor="#FFF8F8"; color="#EF9A9A"; fontsize=13;
+    call [label="model asks for tool(args)", fillcolor="#E8F5E9", color="#43A047"];
+    same [label="identical call\nearlier this run?", shape=diamond, style="filled", fillcolor="#FFEBEE", color="#E53935", fontsize=10];
+    loop [label="earlier failed or was a write → stop\nread → earlier result once, then stop", fillcolor="#FFEBEE", color="#E53935"];
+    srch [label="search budget\n4th call: 'not found is an answer'\n9th: stop", fillcolor="#FFEBEE", color="#E53935"];
+    write [label="a write that needs a tap?\n(WRITES minus drafts\nand own memory)", shape=diamond, style="filled", fillcolor="#FFEBEE", color="#E53935", fontsize=10];
+    taint [label="run tainted?\n(read mail, a page, a document,\na file, a log: UNTRUSTED)", shape=diamond, style="filled", fillcolor="#FFEBEE", color="#E53935", fontsize=10];
+    auth [label="authorize(label): AnyJev yes/no on\nthe user's own words + date + button label\n(never the untrusted text), p ≥ 0.8", fillcolor="#FFF8E1", color="#F9A825"];
+    runit [label="run the tool\n→ service → store", fillcolor="#ECEFF1", color="#546E7A"];
+    defer [label="defer → Proposal button\nmodel told 'waits for the user's tap'", fillcolor="#E3F2FD", color="#1E88E5"];
+    rec [label="record Call(name, args, ok, result)\nresults become evidence (sources)", fillcolor="#ECEFF1", color="#546E7A"];
+  }
+
+  subgraph cluster_reply {
+    label="The final reply"; style="rounded,filled"; fillcolor="#FFF8F8"; color="#EF9A9A"; fontsize=13;
+    out [label="model's text answer", fillcolor="#E8F5E9", color="#43A047"];
+    chk [label="② CHECKS[route]\nlife: every date/time in a tool result, the message or today\nmoney: every figure likewise\nweb: every link from a result · it searched first", fillcolor="#FFEBEE", color="#E53935"];
+    claim [label="① buttons waiting? (once) AnyJev:\n'does the reply say this is already done?'", fillcolor="#FFF8E1", color="#F9A825"];
+    retry [label="ModelRetry once\nwith what failed", fillcolor="#FFEBEE", color="#E53935"];
+    ok [label="reply goes out", fillcolor="#E3F2FD", color="#1E88E5"];
+    fb [label="Stopped → fallback(): the tool lines\nof what was saved / looked up\n(no model involved)", fillcolor="#FFEBEE", color="#E53935"];
+  }
+
+  call -> same; same -> loop [label=" yes"]; same -> srch [label=" no"]; srch -> write;
+  write -> runit [label=" no"]; write -> taint [label=" yes"];
+  taint -> runit [label=" no"]; taint -> auth [label=" yes"]; auth -> runit [label=" asked for"]; auth -> defer [label=" not asked"];
+  runit -> rec; loop -> fb [style=dashed];
+  out -> claim; claim -> chk [label=" no"]; claim -> retry [label=" yes"]; chk -> ok [label=" pass"]; chk -> retry [label=" fail"];
+  retry -> out [style=dashed, label=" rewritten reply;\n checks failing a 2nd time → stop"]; retry -> fb [style=dashed];
+  rec -> out [style=invis];
+}

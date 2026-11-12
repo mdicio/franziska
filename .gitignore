@@ -1,0 +1,34 @@
+# Personal data and secrets live outside the repo: ~/.local/share/franziska (databases, memory, Google token),
+# ~/.config/franziska (.env, client_secret.json, denylist), ~/Documents/finance (bank exports, PDFs, notebooks).
+# These rules only catch strays; .githooks/pre-commit checks the content.
+.env
+.env.*
+!.env.example
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.zip
+*.ipynb
+*.gguf
+*.bak
+client_secret*.json
+*token*.json
+new_token/
+
+# Tool output
+.venv/
+.sandbox-venv/
+__pycache__/
+.ruff_cache/
+.pytest_cache/
+node_modules/
+evals/runs/
+evals/*.log
+
+# SearXNG secret (deploy/searxng/compose.yml)
+deploy/searxng/secret.env

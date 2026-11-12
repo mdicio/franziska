@@ -1,0 +1,31 @@
+// Everything the bot does on its own (bot.py main, catchup.py). Render: docs/diagrams/render.sh
+digraph jobs {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.18, ranksep=0.5,
+         label="Scheduled work: ticks (job queue) and daily slots (catch-up scheduler)", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=plaintext];
+
+  ticks [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="6" color="#B0BEC5">
+    <tr><td bgcolor="#ECEFF1" colspan="3"><b>Repeating ticks</b> (python-telegram-bot JobQueue; a tick that did nothing leaves no trace)</td></tr>
+    <tr><td bgcolor="#F7F9FA"><b>job</b></td><td bgcolor="#F7F9FA"><b>every</b></td><td bgcolor="#F7F9FA"><b>does</b></td></tr>
+    <tr><td align="left">reminders</td><td>60 s</td><td align="left">due reminders with ✅ / snooze buttons, nagging by priority (no model)</td></tr>
+    <tr><td align="left">calendar</td><td>5 min</td><td align="left">mirror Google Calendar into life.sqlite (no model)</td></tr>
+    <tr><td align="left">mail</td><td>10 min</td><td align="left">fetch Gmail headers, triage on the local model, push what needs you</td></tr>
+    <tr><td align="left">library</td><td>2 min</td><td align="left">when the chat is quiet: describe new documents, embed passages and turns (CPU)</td></tr>
+    <tr><td align="left">code</td><td>20 s</td><td align="left">announce finished coding jobs</td></tr>
+  </table>>];
+
+  daily [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="6" color="#B0BEC5">
+    <tr><td bgcolor="#ECEFF1" colspan="4"><b>Daily slots</b> (catchup.Scheduler, jobs.sqlite: a slot missed while the box was off runs late, within its grace)</td></tr>
+    <tr><td bgcolor="#F7F9FA"><b>time</b></td><td bgcolor="#F7F9FA"><b>job</b></td><td bgcolor="#F7F9FA"><b>grace</b></td><td bgcolor="#F7F9FA"><b>does</b></td></tr>
+    <tr><td>04:00</td><td align="left">nightly</td><td>20 h</td><td align="left">housekeeping (every store's retention), event retries, backup</td></tr>
+    <tr><td>04:30</td><td align="left">consolidate</td><td>20 h</td><td align="left">facts pass + weekly digests (local model; retried if it's down)</td></tr>
+    <tr><td>07:30</td><td align="left">brief</td><td>12 h</td><td align="left">today, open tasks, the week, money lines, mail that needs you</td></tr>
+    <tr><td>07:30 Mon</td><td align="left">week</td><td>3 d</td><td align="left">last week's spending</td></tr>
+    <tr><td>07:30 1st</td><td align="left">month</td><td>7 d</td><td align="left">monthly summary</td></tr>
+    <tr><td>07:30:30 Mon–Fri</td><td align="left">markets</td><td>10 h</td><td align="left">market report PDF (weekly edition on Mondays)</td></tr>
+    <tr><td>18:00 Sun</td><td align="left">review</td><td>18 h</td><td align="left">weekly review</td></tr>
+    <tr><td>20:00</td><td align="left">evening</td><td>3 h</td><td align="left">open tasks with ✅ buttons, 📋 plan tomorrow</td></tr>
+    <tr><td colspan="4" align="left"><font point-size="10">times from .env: FRANZISKA_BRIEF_AT, FRANZISKA_MARKET_AT, FRANZISKA_EVENING_AT · /pause skips model and push jobs; reminders, calendar and backup go on</font></td></tr>
+  </table>>];
+  ticks -> daily [style=invis];
+}

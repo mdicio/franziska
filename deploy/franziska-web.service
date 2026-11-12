@@ -1,0 +1,21 @@
+# systemd user service for the web UI (franziska/web). Install:
+#   mkdir -p ~/.config/systemd/user && cp deploy/franziska-web.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now franziska-web
+#   tailscale serve --bg 8765          # HTTPS on https://<box>.<tailnet>.ts.net, tailnet only (needs FRANZISKA_WEB_TOKEN)
+# Logs: journalctl --user -u franziska-web -f
+[Unit]
+Description=Franziska web UI
+After=network-online.target franziska-llm.service
+Wants=network-online.target
+
+[Service]
+# Your clone of the repo (the default assumes ~/franziska)
+WorkingDirectory=%h/franziska
+ExecStart=%h/.local/bin/uv run --env-file .env python -m franziska.web
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PI_TELEMETRY=0 PI_SKIP_VERSION_CHECK=1
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,201 @@
+{
+ "bench": [
+  {
+   "id": "bench-v1",
+   "legacy": true,
+   "at": "2026-11-01T21:37:55",
+   "commit": "ebe74d4",
+   "note": "rows without version fields (before 2026-11-02 15:22). Same runner, worlds and tasks as bench-v2; what changed since (no default token cap, budgets recorded per row) is in each row's budget, and evals.plan compares budgets. Tasks unchanged since commit ebe74d4 (2026-11-01 21:37); rows from earlier that day can't be checked against it and are taken as equal.",
+   "task_v": {
+    "add_recurrence": "a0c17774f8",
+    "ambiguous_booking": "2da7fa31d0",
+    "ask_bollo": "495a80373b",
+    "ask_plumber": "565cc15320",
+    "book_haircut": "b58d8b01ab",
+    "build_wc": "7f74f53e8d",
+    "calendar_move": "a24caecb8b",
+    "cancel_yoga": "435b9809e4",
+    "cash_coffee": "9b4b457cc8",
+    "condo_bill": "838ad197d9",
+    "cron_next": "e2b3f6ac05",
+    "data_report": "8b672a8cb8",
+    "delivery_budget": "2da0d55f45",
+    "dentist_clash": "0ff376538b",
+    "dinner_en": "4594e085b4",
+    "done_gift": "4b39a54aaf",
+    "expr_eval": "5dc865d878",
+    "fix_bankcsv": "5299befae4",
+    "fix_inventory": "57a5217915",
+    "focus_block": "cf49197eb1",
+    "free_slots": "7e52ae1e8b",
+    "free_thursday": "fda5cd8d03",
+    "gate_code": "71ddf0f969",
+    "gate_code_changed": "b3a1b1aaae",
+    "gift_with_notes": "5ce4ff7185",
+    "grocery_trend": "5d78d36be4",
+    "iban_check": "750f8c8007",
+    "ics_parse": "e987cb5281",
+    "italian_dates": "5377c06fe8",
+    "json_parse": "91206f366a",
+    "ma_budget": "a92a012bad",
+    "ma_taxslot": "cb1bb704a8",
+    "ma_trip": "c34076153a",
+    "mm_condo_mail": "ac890ea02b",
+    "mm_flaky": "2791faf02a",
+    "mm_giulia": "6ba4dcc836",
+    "mm_gym": "58dce6ad63",
+    "mm_laura": "d78c9918cd",
+    "mm_milan_trip": "58efa363a7",
+    "mm_month_close": "c7381f43ed",
+    "mm_plumber": "b437c6564f",
+    "move_dentist": "9083573075",
+    "overdue_to_friday": "9bccaff2c7",
+    "parse_amount": "050f269bab",
+    "parse_duration": "77d7587974",
+    "past_meeting": "9882213c72",
+    "plastic_thursday": "88b9960039",
+    "recurring_detect": "e49311a827",
+    "recurring_total": "01a2abfaf2",
+    "regex_engine": "29968e752d",
+    "remind_call": "04e357fe85",
+    "restaurant_budget": "a4d0ece278",
+    "rrule_expand": "352cda7530",
+    "save_passport": "a040b86225",
+    "slugify": "679df31609",
+    "split_bill": "f8e4c9f812",
+    "todo_cli_feature": "cbbbe81f1c",
+    "topo_schedule": "732c988d6d",
+    "trash_weekly": "a5f7ecbe82",
+    "ttl_cache": "030ef42a07",
+    "two_marcos": "6fd9a5c6cf",
+    "two_marcos_followup": "06d8700418",
+    "unread_injection": "3c1e516f6d",
+    "vacation_shift": "dc8c1d0471",
+    "whats_tomorrow": "3831b1965b",
+    "wifi_en": "f0b87961b5"
+   },
+   "task_v_note": "task versions of the tasks as committed in ebe74d4 (computed from that tree), which every unversioned bench row ran; matches the task_v of all versioned rows written before the 2026-11-02 judge fixes"
+  },
+  {
+   "id": "bench-v2",
+   "hash": "2c0d307f6e",
+   "files": {
+    "evals/bench.py": "ac4ef51b00",
+    "evals/tasks/base.py": "5ca9f88a84",
+    "evals/tasks/worlds.py": "4b50743af3",
+    "evals/tasks/home.py": "8c65ac3c81"
+   },
+   "at": "2026-11-02T15:22:25",
+   "commit": "ebe74d4+dirty",
+   "note": "cloud endpoints (DeepInfra), version/config ids and cost in each row; local runs unchanged",
+   "same_as": "bench-v1"
+  },
+  {
+   "id": "bench-v3",
+   "hash": "295b6b6533",
+   "files": {
+    "evals/bench.py": "4b60d64d73",
+    "evals/tasks/base.py": "5ca9f88a84",
+    "evals/tasks/worlds.py": "4b50743af3",
+    "evals/tasks/home.py": "82f9d7f9d1"
+   },
+   "at": "2026-11-02T19:47:58",
+   "commit": "ebe74d4+dirty",
+   "note": "Home tasks on the bot's real prompts (secretary/finance INSTRUCTIONS + dated part, ask tool text, route prompts for sub-agents, time stamp before messages), tx view, shift_date/set_priority, add_bill for life. Gated on the Home world (STAMP, sub_system); every Home task's task_v changed with it, so only they rerun. Workspace, Life and Office tasks run unchanged.",
+   "same_as": "bench-v1"
+  },
+  {
+   "id": "bench-v4",
+   "hash": "8e93f9cbbf",
+   "files": {
+    "evals/bench.py": "4b60d64d73",
+    "evals/tasks/base.py": "5ca9f88a84",
+    "evals/tasks/worlds.py": "4b50743af3",
+    "evals/tasks/home.py": "4d84e457dc"
+   },
+   "at": "2026-11-02T19:48:52",
+   "commit": "ebe74d4+dirty",
+   "note": "home.py module docstring only",
+   "same_as": "bench-v1"
+  },
+  {
+   "id": "bench-v5",
+   "hash": "6eb9a1f65a",
+   "files": {
+    "evals/bench.py": "1fe4c51c1b",
+    "evals/tasks/base.py": "5ca9f88a84",
+    "evals/tasks/worlds.py": "4b50743af3",
+    "evals/tasks/home.py": "4d84e457dc"
+   },
+   "at": "2026-11-02T20:12:21",
+   "commit": "ebe74d4+dirty",
+   "note": "another session: Claude-subscription servers (evals/claude_chat.py), no GPU hold for cloud-only runs; local runs unchanged",
+   "same_as": "bench-v1"
+  }
+ ],
+ "mail": [
+  {
+   "id": "mail-v0",
+   "legacy": true,
+   "at": "2026-10-31T23:59:00",
+   "note": "rows without version fields from runs before 2026-11-01: the mail agent and harness before the 2026-10-31 fixes (evals/reports/2026-10-31/harness-fixes.md). Not equal to any later version."
+  },
+  {
+   "id": "mail-v1",
+   "legacy": true,
+   "at": "2026-11-02T14:00:00",
+   "commit": "ebe74d4",
+   "note": "rows without version fields from 2026-11-01 on: gmail_search returned the model's max (default 10) and each request was capped at 4096 tokens. Not equal to mail-v2."
+  },
+  {
+   "id": "mail-v2",
+   "hash": "510f4af33d",
+   "files": {
+    "evals/mail_eval.py": "4ce60a73c2",
+    "evals/fake_gog.py": "92c6393cda",
+    "evals/mailbox.py": "f48eb0bd0a",
+    "evals/gog_tools.json": "65d25db7d0",
+    "franziska/mail/agent.py": "49c4231502",
+    "franziska/mcp_server.py": "2882cef34f",
+    "franziska/llm.py": "fd93dbb81c"
+   },
+   "at": "2026-11-02T15:22:25",
+   "commit": "ebe74d4+dirty",
+   "note": "the bot's gmail_search fetches 100 hits and says when more match; no token cap per request; cloud endpoints, version/config ids, input tokens and cost in each row"
+  },
+  {
+   "id": "mail-v3",
+   "hash": "96613817b3",
+   "files": {
+    "evals/mail_eval.py": "4ce60a73c2",
+    "evals/fake_gog.py": "92c6393cda",
+    "evals/mailbox.py": "f48eb0bd0a",
+    "evals/gog_tools.json": "65d25db7d0",
+    "franziska/mail/agent.py": "49c4231502",
+    "franziska/mcp_server.py": "2882cef34f",
+    "franziska/llm.py": "61ba602f67"
+   },
+   "at": "2026-11-02T19:48:01",
+   "commit": "ebe74d4+dirty",
+   "note": "llm.py: Claude-subscription routes added (another session's work, 19:35). Off unless claude_model is set, and mail is never in CLAUDE_OK; build_model / build_cloud_model, which mail_eval uses, unchanged. Equal to mail-v2.",
+   "same_as": "mail-v2"
+  },
+  {
+   "id": "mail-v4",
+   "hash": "d01ff65e04",
+   "files": {
+    "evals/mail_eval.py": "43893ada1c",
+    "evals/fake_gog.py": "92c6393cda",
+    "evals/mailbox.py": "f48eb0bd0a",
+    "evals/gog_tools.json": "65d25db7d0",
+    "franziska/mail/agent.py": "49c4231502",
+    "franziska/mcp_server.py": "2882cef34f",
+    "franziska/llm.py": "61ba602f67"
+   },
+   "at": "2026-11-02T21:18:43",
+   "commit": "ebe74d4+dirty",
+   "note": "another session: claude-* server entries (Claude subscription via claude_chat), no GPU hold for cloud-only runs; local scenarios and the bot's mail agent unchanged",
+   "same_as": "mail-v2"
+  }
+ ]
+}

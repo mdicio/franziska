@@ -1,0 +1,40 @@
+// Finance and investments (finance/, invest/). Render: docs/diagrams/render.sh
+digraph finance {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.25, ranksep=0.4,
+         label="💶 Finance: deterministic figures, the model only picks the query", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  subgraph cluster_files {
+    label="Exports you send (Telegram, web, CLI)"; style="rounded,filled"; fillcolor="#F5F9FF"; color="#90CAF9"; fontsize=13;
+    intesa [label="Intesa Sanpaolo .xlsx\n'Lista Operazione' / 'Lista Movimenti'", fillcolor="#E3F2FD", color="#1E88E5"];
+    revolut [label="Revolut statement\n.csv / .xlsx", fillcolor="#E3F2FD", color="#1E88E5"];
+    degiro [label="DEGIRO .csv\nTransactions · Account statement ·\nPortfolio", fillcolor="#E3F2FD", color="#1E88E5"];
+    cash [label="'ho pagato 15 € dal barbiere'\n(record_cash)", fillcolor="#E3F2FD", color="#1E88E5"];
+  }
+
+  imp [label="finance/importer.py\nparse → Statement\nbalances must add up to the cent,\nelse the whole file is refused", fillcolor="#ECEFF1", color="#546E7A"];
+  merch [label="merchants.py\ncounterparty out of 6 bank text\nshapes (POS, Bancomat Pay, SDD, …)", fillcolor="#ECEFF1", color="#546E7A"];
+  links [label="links.py\nown transfers (Intesa ↔ Revolut,\nsavings moves): neither income\nnor spending", fillcolor="#ECEFF1", color="#546E7A"];
+  cats [label="categories.py\n11 spending groups per payee\ncategory = bank / cash / user\nproposed_category = model's guess", fillcolor="#ECEFF1", color="#546E7A"];
+  jev [label="categorise workflow\none AnyJev choice per new payee\n(batches of 20, local)", fillcolor="#FFF8E1", color="#F9A825"];
+
+  inv [label="invest/importer.py + service.py\ncontent-hash ids (idempotent) ·\nbalance chain · orders matched ·\nsnapshot check · weighted avg cost", fillcolor="#ECEFF1", color="#546E7A"];
+
+  ledger [label="ledger.sqlite (integer cents)\ntransactions · imports · balances · links ·\npayees · budgets · bills · bill_payments\ninv_trades · inv_movements · inv_snapshots →\ninv_positions · inv_realized · inv_income\nview: tx", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+
+  money [label="Money (finance/service.py)\nmonth / week summary · budgets 🟢🟠🔴 ·\nrecurring charges · price change > 15% ·\nbills + reconcile · brief lines\nPortfolio (invest/service.py)", fillcolor="#ECEFF1", color="#546E7A"];
+  agent [label="finance/agent.py\nmonth_summary · week_summary · recurring_charges ·\nbudgets · set_budget · add_bill · bill_paid · remove_bill ·\nset_payee_category · record_cash · edit_cash · portfolio ·\nquery_ledger (SELECT on a read-only connection + authorizer)\n+ market reports · run_python (sandbox)", fillcolor="#E8F5E9", color="#43A047"];
+  guard [label="guard 'figures':\nevery number in the reply must be\nin a tool result or your message", fillcolor="#FFEBEE", color="#E53935"];
+
+  life [label="Life (secretary)\n'Pay <payee>' task, no amount", fillcolor="#ECEFF1", color="#546E7A"];
+  ev [label="events.sqlite outbox\nbill.paid {bill_id, task_id, …}\nhandlers idempotent, retried nightly", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+
+  intesa -> imp; revolut -> imp; {rank=same; imp -> merch -> links -> cats;} cats -> ledger; {rank=same; jev; cats} cats -> jev [dir=both, style=dashed];
+  degiro -> inv -> ledger; cash -> agent [style=dashed];
+  ledger -> money [dir=both]; agent -> money; agent -> guard [style=dashed, dir=none];
+  money -> life [label=" add_bill: task with\n due + reminder", color="#43A047"];
+  money -> ev [label=" import pays a bill\n (text match, ±20%, date window)"]; ev -> life [label=" complete / next due"];
+  {rank=same; money; agent; guard}
+  {rank=same; life; ev}
+}

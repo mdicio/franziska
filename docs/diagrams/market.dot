@@ -1,0 +1,30 @@
+// The market report pipeline (market/, workflows/markets.py; INVEST.md §4). Render: docs/diagrams/render.sh
+digraph market {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.28, ranksep=0.4,
+         label="📈 Market report: public data to the model, your portfolio only to the PDF", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  subgraph cluster_public {
+    label="Public side: market.sqlite (could be read by a cloud model)"; style="rounded,filled"; fillcolor="#F5F9FF"; color="#90CAF9"; fontsize=13;
+    src [label="sources.py (one paced client)\nYahoo chart closes · FRED · ECB FX ·\nRSS · Google News · Fed/ECB calendars ·\nNasdaq earnings · trafilatura", fillcolor="#ECEFF1", color="#546E7A"];
+    fig [label="figures.py\nindices · rates · FX · commodities\nday / week / month change,\ncloses before the report's day", fillcolor="#ECEFF1", color="#546E7A"];
+    news [label="news.py\nfixed feeds + code-written searches\nfrom names/tickers held (no numbers),\nduplicates merged", fillcolor="#ECEFF1", color="#546E7A"];
+    pick [label="① pick\nwhich headlines matter\nto these instruments", fillcolor="#EDE7F6", color="#5E35B1"];
+    dig [label="② digest per story\ntopic · holdings · 2 sentences\n(cached: weekly reuses dailies)", fillcolor="#EDE7F6", color="#5E35B1"];
+    write [label="③ write the report\nfrom table + calendar + digests,\neach point cites story numbers", fillcolor="#EDE7F6", color="#5E35B1"];
+    num [label="every number must appear in what\nthe model was given; a failing point\nis rewritten once, then dropped", fillcolor="#FFEBEE", color="#E53935"];
+    {rank=same; news; pick; dig; write}
+  }
+  subgraph cluster_private {
+    label="Private side: code only, never in the model's input"; style="rounded,filled"; fillcolor="#FFF8F8"; color="#EF9A9A"; fontsize=13;
+    pos [label="ledger.sqlite\ninv_positions", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+    ov [label="overlay.py\nvalue · change · each holding's\ncontribution · cash share ·\nconcentration (ECB FX)", fillcolor="#ECEFF1", color="#546E7A"];
+  }
+  pdf [label="pdf.py: WeasyPrint\nHTML/CSS → 2–3 page PDF,\ninline SVG charts, ▲/▼ markers", fillcolor="#ECEFF1", color="#546E7A"];
+  out [label="Telegram: PDF + caption\nweekdays after the brief, weekly on Mondays\n(/markets, 'mandami il report')\noptional: mailed to yourself", fillcolor="#E3F2FD", color="#1E88E5"];
+  ladder [label="degrade ladder: no model → figures + overlay + headlines ·\nno search → overlay alone, saying which step failed", shape=note, fillcolor="#FFFFFF", color="#90A4AE", fontsize=10];
+
+  src -> fig; src -> news; news -> pick -> dig -> write; fig -> write; write -> num [dir=both, style=dashed];
+  pos -> ov; fig -> ov [label=" closes"]; write -> pdf; ov -> pdf; pdf -> out; out -> ladder [style=invis];
+}

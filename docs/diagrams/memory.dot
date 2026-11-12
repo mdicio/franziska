@@ -1,0 +1,60 @@
+// What Franziska remembers, and where (memory.py, turns.py, summary.py, consolidate.py, secretary/memory.py)
+digraph memory {
+  graph [rankdir=LR, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.28, ranksep=0.6,
+         label="Memory: one job, one place (nothing is copied between stores)", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  run [label="an agent run\non route R", fillcolor="#E8F5E9", color="#43A047", width=1.6];
+
+  subgraph cluster_short {
+    label="In the prompt every turn"; style="rounded,filled"; fillcolor="#F8F5FD"; color="#B39DDB"; fontsize=13;
+    hist [label="History of route R\nlast ~6 whole turns (Budget.history_turns)\nper chat AND per assistant", fillcolor="#EDE7F6", color="#5E35B1"];
+    summ [label="Rolling summary of R\nturns that aged out, folded by the\nlocal model in the background", fillcolor="#EDE7F6", color="#5E35B1"];
+    thread [label="Thread\nthe chat's last 8 turns (≤12 h) across\nassistants, filtered by privacy.SEES", fillcolor="#EDE7F6", color="#5E35B1"];
+    index [label="Memory index\nprofile + R's own entries\n(≤1500 chars, '(?)' = unconfirmed)", fillcolor="#EDE7F6", color="#5E35B1"];
+  }
+
+  subgraph cluster_tools {
+    label="Pulled with tools when needed"; style="rounded,filled"; fillcolor="#F4FBF4"; color="#A5D6A7"; fontsize=13;
+    t_mem [label="read_memory · learn ·\nforget_memory", fillcolor="#E8F5E9", color="#43A047"];
+    t_past [label="past_conversations(query)\nFTS5 words + vectors, fused\nonly routes R may see", fillcolor="#E8F5E9", color="#43A047"];
+    t_notes [label="remember · recall · forget\n(life and mail only)", fillcolor="#E8F5E9", color="#43A047"];
+  }
+
+  subgraph cluster_stores {
+    label="Stores"; style="rounded,filled"; fillcolor="#FFFFFF"; color="#78909C"; fontsize=13;
+    node [shape=cylinder, fillcolor="#FFFFFF", color="#37474F", fontsize=10];
+    files [label="memory/<scope>/<name>.md\nscopes: profile · life · money · mail\nfrontmatter: confidence, seen, was …"];
+    turns [label="turns.sqlite\nturns + turns_fts + turn_vectors ·\ndigests · conversations (history, summary)"];
+    notes [label="life.sqlite: notes\nFTS5, accents folded"];
+  }
+
+  subgraph cluster_bg {
+    label="Background, no user waiting"; style="rounded,filled"; fillcolor="#F7F9FA"; color="#B0BEC5"; fontsize=13;
+    fold [label="fold (summary.py)\nafter a reply, when the chat is quiet 60 s", fillcolor="#ECEFF1", color="#546E7A"];
+    facts [label="facts pass (consolidate.py)\n≤3 facts per route → cache entries,\n'inferred' unless all in the user's words", fillcolor="#ECEFF1", color="#546E7A"];
+    digest [label="weekly digests (04:30)\nturns > 90 days summarised per\nISO week, then raw rows deleted", fillcolor="#ECEFF1", color="#546E7A"];
+  }
+
+  tap [label="💾 profile proposal\n→ user taps ✅", fillcolor="#E3F2FD", color="#1E88E5"];
+
+  hist -> run; summ -> run; thread -> run; index -> run;
+  run -> t_mem; run -> t_past; run -> t_notes;
+  t_mem -> files; t_past -> turns; t_notes -> notes;
+  run -> turns [label=" every turn logged", style=dashed];
+  run -> tap [label=" learn(profile=True)\n or a lasting note", style=dashed]; tap -> files [label=" set_profile"];
+  turns -> fold [style=dashed]; fold -> summ [style=dashed];
+  turns -> facts [style=dashed]; facts -> files [style=dashed];
+  turns -> digest [style=dashed]; digest -> turns [style=dashed];
+
+  rules [shape=plaintext, style="", label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="5" color="#90A4AE">
+    <tr><td bgcolor="#ECEFF1"><b>job</b></td><td bgcolor="#ECEFF1"><b>lives in</b></td></tr>
+    <tr><td align="left">facts the user asked to keep (gate code)</td><td align="left">notes</td></tr>
+    <tr><td align="left">what the assistant learned</td><td align="left">memory files</td></tr>
+    <tr><td align="left">what was said earlier</td><td align="left">turn log</td></tr>
+    <tr><td align="left">this conversation so far</td><td align="left">history + rolling summary</td></tr>
+    <tr><td align="left">undoing a change</td><td align="left">each store's own undo</td></tr>
+  </table>>];
+  files -> rules [style=invis];
+}

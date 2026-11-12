@@ -1,0 +1,9 @@
+{"cfg": "q38iq3-24kq8", "load_s": 6, "vram_mib": 11529, "runs": [{"prompt_n": 2675, "pp": 542, "gen_n": 400, "tg": 20.5, "draft_acc": "-/-"}], "ollama_interfered": false}
+{"cfg": "q38iq3-16kq4", "load_s": 4, "vram_mib": 11033, "runs": [{"prompt_n": 2675, "pp": 567, "gen_n": 400, "tg": 20.7, "draft_acc": "-/-"}], "ollama_interfered": false}
+{"cfg": "q38iq3-16kq4-mtp", "load_s": 6, "vram_mib": 11769, "runs": [{"prompt_n": 2675, "pp": 466, "gen_n": 400, "tg": 9.1, "draft_acc": "261/413"}], "ollama_interfered": false}
+{"cfg": "q38q4-32kq4", "load_s": 15, "vram_mib": 11603, "runs": [{"prompt_n": 2675, "pp": 329, "gen_n": 400, "tg": 4.9, "draft_acc": "-/-"}], "ollama_interfered": false}
+{"cfg": "q38q4-ffncpu", "load_s": 4, "vram_mib": 7624, "runs": [{"prompt_n": 2675, "pp": 257, "gen_n": 400, "tg": 3.6, "draft_acc": "-/-"}], "ollama_interfered": false}
+{"cfg": "gsq-fit", "load_s": 8, "vram_mib": 10996, "runs": [{"prompt_n": 2675, "pp": 429, "gen_n": 400, "tg": 5.9, "draft_acc": "-/-"}], "ollama_interfered": false}
+{"cfg": "gsq-16kq4", "load_s": 4, "vram_mib": 11089, "runs": [{"prompt_n": 2675, "pp": 533, "gen_n": 400, "tg": 20.7, "draft_acc": "-/-"}], "ollama_interfered": false}
+{"cfg": "g26-fit", "load_s": 12, "vram_mib": 10982, "ram_mib": 13822, "runs": [{"prompt_n": 2696, "pp": 567, "gen_n": 400, "tg": 34.6, "draft_acc": "-/-"}], "ollama_interfered": false}
+{"cfg": "g26qat-fit", "load_s": 18, "vram_mib": 10775, "ram_mib": 12979, "runs": [{"prompt_n": 2696, "pp": 784, "gen_n": 400, "tg": 49.9, "draft_acc": "-/-"}], "ollama_interfered": false}

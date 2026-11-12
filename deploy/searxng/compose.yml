@@ -1,0 +1,17 @@
+# SearXNG for the web route and the market brief (DESIGN decision 26). Local only: 127.0.0.1:8888, no limiter.
+#   cd deploy/searxng && docker compose up -d            # restarts with Docker (unless-stopped)
+#   echo 'FRANZISKA_SEARXNG_URL=http://127.0.0.1:8888' >> .env && systemctl --user restart franziska-bot franziska-web
+# The secret is generated once into secret.env (git-ignored). Engine health: http://127.0.0.1:8888/stats
+services:
+  searxng:
+    image: searxng/searxng:2026.10.30-ffa88e3ba
+    container_name: franziska-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    env_file: secret.env
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}

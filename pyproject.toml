@@ -1,0 +1,46 @@
+[project]
+name = "franziska"
+version = "0.1.0"
+description = "A local-first personal assistant for life admin (schedule, money, mail, documents) on your own GPU, over Telegram and a web app."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic-ai-slim[mcp,openai]==2.61.0",
+    "python-telegram-bot[job-queue]>=22.8",
+    "openpyxl>=3.1",
+    "mcp>=2.3",
+    "anyjev",
+    "llama-cpp-python==0.3.36",
+    "httpx>=0.28",
+    "fastapi>=0.120",
+    "uvicorn>=0.38",
+    "weasyprint>=66",
+    "trafilatura>=2.0",
+    "faster-whisper>=1.2.1",
+    "av<16",
+    "python-multipart>=0.0.20",
+    "opentelemetry-sdk>=1.45",
+    "opentelemetry-exporter-otlp-proto-http>=1.45",
+    "datasette>=0.65",
+    "claude-agent-sdk>=0.2.176",
+]
+
+[dependency-groups]
+dev = ["pytest>=9", "pytest-asyncio>=1.0"]
+
+# No [build-system]: uv treats this as an application, not an installable package.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-m 'not ollama and not week'"
+markers = [
+    "ollama: needs a running local Ollama with the configured model (opt-in: pytest -m ollama)",
+    "week: evals/week.py, a simulated week on the real local model, ~10-15 min (opt-in: pytest -m week)",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.uv.sources]
+anyjev = { git = "https://github.com/nokia-applied-research/AnyJev", rev = "35311c58955716cb8955ce1368a665988bc63735" }

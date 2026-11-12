@@ -1,0 +1,40 @@
+# On top of SearXNG's defaults (use_default_settings). JSON is what Franziska reads; the HTML UI stays for checking.
+use_default_settings: true
+
+general:
+  instance_name: "franziska"
+  enable_metrics: true
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "auto"
+  formats: [html, json]
+
+server:
+  limiter: false          # only Franziska calls it, from this machine
+  public_instance: false
+  image_proxy: false
+  # secret_key comes from SEARXNG_SECRET (secret.env)
+
+outgoing:
+  request_timeout: 4.0
+  max_request_timeout: 8.0
+  pool_connections: 100
+  pool_maxsize: 20
+
+engines:
+  # Upstream defaults (google cse, duckduckgo, brave, wikipedia; news: duckduckgo/bing/google news, …) plus mojeek.
+  # Checked 2026-10-30 from this IP: google, qwant answered 'access denied', bing a connection error, so they stay off.
+  # A ban (captcha, 429) suspends one engine; the others still answer. See /stats.
+  - name: mojeek
+    inactive: false
+    disabled: false
+  # News: duckduckgo news, bing news and brave.news answer. Google news: 'access denied'; reuters: HTTP 401;
+  # wikinews: years-old articles.
+  - name: google news
+    disabled: true
+  - name: reuters
+    disabled: true
+  - name: wikinews
+    disabled: true

@@ -1,0 +1,26 @@
+# systemd user service for the local model: llama.cpp's llama-server with gemma-4-26B-A4B, used by every agent, the
+# router and mail (DESIGN decision 19; why this model: docs/MODEL_NOTES.md). Install:
+#   cp deploy/franziska-llm.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now franziska-llm
+# Logs: journalctl --user -u franziska-llm -f
+# --fit places the MoE experts that don't fit in the 12 GB in RAM (~10.7 GB VRAM used, 38 tok/s). Sampling flags are
+# Gemma's recommended values; the bot's agents send temperature 0 per request, the mail agent uses these.
+# evals/mail_eval.py stops this unit while it runs its own servers and starts it again after.
+[Unit]
+Description=Local model server (llama-server, gemma-4-26B-A4B)
+
+[Service]
+# Vision (documents.py, rung 3): add `--mmproj %h/models/gguf/gemma-4-26B-A4B-it-mmproj-F16.gguf` (downloaded 2026-10-29).
+# Measured: reads a photographed bill fine, ~400 tokens per image, but prefill -11% and generation -5% on every turn,
+# so it stays off until documents.py uses it. `--swa-full` (router latency) was worse on every count:
+# router 4.5 → 5.0 s, prefill 781 → 611 tok/s, generation 38 → 32 tok/s (2026-10-29).
+Environment=LLAMA=%h/.local/opt/llama.cpp/llama-b11936
+Environment=LD_LIBRARY_PATH=%h/.local/opt/llama.cpp/llama-b11936:%h/.local/opt/llama.cpp/cudart-llama-b11936-bin-ubuntu-cuda-12.8-x64
+ExecStart=/bin/sh -c 'exec "$LLAMA/llama-server" -m %h/models/gguf/gemma-4-26B-A4B-it-UD-Q4_K_M.gguf \
+  --host 127.0.0.1 --port 8080 -c 32768 -np 1 -fa on -ctk q8_0 -ctv q8_0 --jinja --fit on \
+  --temp 1.0 --top-k 64 --top-p 0.95'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

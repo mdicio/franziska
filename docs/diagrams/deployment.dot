@@ -1,0 +1,60 @@
+// What runs where: processes, ports, subprocesses and data. Render: docs/diagrams/render.sh
+digraph deployment {
+  graph [rankdir=LR, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.25, ranksep=0.7, compound=true,
+         label="Deployment: one Linux machine today (box + desktop split optional, deploy/BOX.md)", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  subgraph cluster_you {
+    label="You"; style="rounded,dashed"; color="#9E9E9E"; fontsize=13;
+    node [style="rounded,filled,dashed", fillcolor="#FAFAFA", color="#9E9E9E"];
+    phone  [label="Phone / laptop\nTelegram app · PWA", style="rounded,filled", fillcolor="#E3F2FD", color="#1E88E5"];
+    tgapi  [label="api.telegram.org\n(long polling: outbound only,\nno open port)"];
+    ts     [label="tailscale serve\nHTTPS on the tailnet"];
+  }
+  subgraph cluster_net {
+    label="Outside APIs (outbound)"; style="rounded,dashed"; color="#9E9E9E"; fontsize=13;
+    node [style="rounded,filled,dashed", fillcolor="#FAFAFA", color="#9E9E9E"];
+    gapi   [label="Google APIs\nCalendar · Gmail · Drive"];
+    openai [label="ChatGPT (pi login)\nAnthropic (claude login)\nOpenRouter / DeepInfra"];
+    pub    [label="Yahoo · ECB · FRED · RSS\nsearch engines"];
+  }
+
+  subgraph cluster_host {
+    label="Linux host · systemd --user units (loginctl enable-linger)"; style="rounded,filled"; fillcolor="#FAFBFC"; color="#78909C"; fontsize=13;
+
+    subgraph cluster_bot {
+      label="franziska-bot.service"; style="rounded,filled"; fillcolor="#F5F9FF"; color="#90CAF9";
+      bot  [label="python -m franziska.bot\nCore + Telegram adapter\njob queue (reminders, brief, …)", fillcolor="#E3F2FD", color="#1E88E5"];
+      sub1 [label="subprocesses on demand:\ngog mcp (Gmail, stdio)\npython -m franziska.mcp_server (life)\nnode pi/think.ts (/think)\nclaude (Agent SDK)", fillcolor="#FFFFFF", color="#90CAF9", fontsize=10];
+    }
+    subgraph cluster_web {
+      label="franziska-web.service"; style="rounded,filled"; fillcolor="#F5F9FF"; color="#90CAF9";
+      web [label="python -m franziska.web\nFastAPI · uvicorn 127.0.0.1:8765\nits own Core (chat id 0)\n/sql/ Datasette · /phoenix/ proxy", fillcolor="#E3F2FD", color="#1E88E5"];
+    }
+    llm   [label="franziska-llm.service\nllama-server :8080\ngemma-4-26B-A4B UD-Q4_K_M\n32k ctx · --fit on · RTX 3060 12 GB", fillcolor="#FBE9E7", color="#F4511E"];
+    emb   [label="franziska-embed.service\nllama-server :8081\nEmbeddingGemma-300M · CPU, 4 threads", fillcolor="#FBE9E7", color="#F4511E"];
+    phx   [label="franziska-phoenix.service\n(started from the web UI)\nPhoenix :6006", fillcolor="#ECEFF1", color="#546E7A", style="rounded,filled,dashed"];
+    code  [label="franziska-code-<id>\ntransient unit per coding job\npython -m franziska.code run", fillcolor="#ECEFF1", color="#546E7A", style="rounded,filled,dashed"];
+    sbx   [label="transient systemd-run scopes\nbubblewrap sandbox\nrun_python · job commands", fillcolor="#FFEBEE", color="#E53935", style="rounded,filled,dashed"];
+    searx [label="SearXNG (Docker compose)\n127.0.0.1:8888", fillcolor="#ECEFF1", color="#546E7A"];
+    lock  [label="GPU lock file\n(gpu.py, cross-process)", shape=note, fillcolor="#FFF8E1", color="#F9A825"];
+    data  [label="~/.local/share/franziska\n*.sqlite · memory/ · library/files ·\ncache/ · reports/ · code/ · backup/", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+    env   [label="~/.config/franziska/.env\n(symlinked as ./.env)\nsecrets, settings", shape=note, fillcolor="#FFFFFF", color="#37474F"];
+  }
+
+  phone -> tgapi [label=" messages"]; tgapi -> bot [label=" getUpdates", dir=back];
+  phone -> ts; ts -> web [label=" cookie / token"];
+  bot -> llm [label=" agents + router"]; web -> llm;
+  bot -> emb [style=dashed]; web -> emb [style=dashed];
+  bot -> lock [style=dotted, arrowhead=none]; web -> lock [style=dotted, arrowhead=none]; code -> lock [style=dotted, arrowhead=none];
+  bot -> data; web -> data; sub1 -> data [style=dashed];
+  bot -> searx [style=dashed]; searx -> pub [style=dashed];
+  sub1 -> gapi [style=dashed]; bot -> gapi [label=" calendar sync,\n mail fetch", style=dashed];
+  sub1 -> openai [style=dotted];
+  bot -> code [label=" systemd-run --user", style=dashed]; code -> sbx; bot -> sbx [label=" run_python", style=dashed];
+  code -> llm [style=dashed];
+  web -> phx [style=dashed, label=" proxy"];
+  env -> bot [style=dotted, arrowhead=none]; env -> web [style=dotted, arrowhead=none];
+  gapi -> openai -> pub [style=invis];
+}

@@ -1,0 +1,29 @@
+/* Datasette (/sql/) in Franziska's colours: the same tokens as style.css, laid over Datasette's own stylesheet. */
+:root {
+  --bg: #f6f3ee; --surface: #fffdf9; --sunk: #efebe4; --ink: #1f2328; --muted: #6b665e; --line: #e4ddd2;
+  --accent: #2f6f62; --accent-ink: #ffffff; --accent-soft: #e2eeea;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #15171a; --surface: #1d2024; --sunk: #191b1f; --ink: #ece8e1; --muted: #9a958c; --line: #2c3035;
+    --accent: #72b6a5; --accent-ink: #10201c; --accent-soft: #1f3330; color-scheme: dark; }
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; color: var(--ink); }
+a:link, a:visited, button.button-as-link { color: var(--accent); }
+a:hover, a:focus, a:active { color: var(--ink); }
+header, footer, details .nav-menu-inner { background: var(--surface); color: var(--muted); border-bottom: 1px solid var(--line); }
+footer { border-top: 1px solid var(--line); border-bottom: 0; }
+header a:link, header a:visited, footer a:link, footer a:visited, header button.button-as-link { color: var(--accent); }
+header .crumbs .home-franziska { font-weight: 600; margin-right: .6em; }
+table.rows-and-columns { background: var(--surface); }
+.rows-and-columns th { background: var(--sunk); color: var(--muted); }
+.rows-and-columns td, .rows-and-columns th { border-color: var(--line); }
+.rows-and-columns tbody tr:hover { background: var(--accent-soft); }
+textarea, input[type=search], input[type=text], select { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+form input[type=submit] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); border-radius: 999px; }
+form button[type=button] { color: var(--accent); border-color: var(--accent); background: var(--surface); border-radius: 999px; }
+pre, code, .CodeMirror, .cm-editor { background: var(--sunk); color: var(--ink); }
+.facet-results { background: var(--surface); border-radius: 12px; }

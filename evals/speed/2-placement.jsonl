@@ -1,0 +1,3 @@
+{"cfg": "q38iq3-32kq4", "load_s": 4, "vram_mib": 11696, "runs": [{"prompt_n": 2675, "pp": 551, "gen_n": 400, "tg": 19.9, "draft_acc": "-/-"}]}
+{"cfg": "q38iq3-32kq4-mtp", "load_s": 6, "vram_mib": 11707, "runs": [{"prompt_n": 2675, "pp": 412, "gen_n": 400, "tg": 6.3, "draft_acc": "255/432"}]}
+{"cfg": "q38iq3-24kq8", "load_s": 4, "vram_mib": 11713, "runs": [{"prompt_n": 2675, "pp": 499, "gen_n": 400, "tg": 9.4, "draft_acc": "-/-"}]}

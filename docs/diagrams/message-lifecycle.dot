@@ -1,0 +1,55 @@
+// The life of one Telegram message, from update to reply and button tap. Render: docs/diagrams/render.sh
+digraph lifecycle {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.3, ranksep=0.32,
+         label="The life of a message (bot.py → core.py → agent → services → reply)", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  // adapter
+  upd    [label="① Telegram update\ntext · voice (faster-whisper → text) · photo/PDF (receive → library)", fillcolor="#E3F2FD", color="#1E88E5"];
+  allow  [label="sender in\nFRANZISKA_ALLOWED_IDS?", shape=diamond, style="filled", fillcolor="#FFEBEE", color="#E53935", fontsize=10];
+  up     [label="model server up?\n(compute.Desktop)", shape=diamond, style="filled", fillcolor="#E3F2FD", color="#1E88E5", fontsize=10];
+  off    [label="FRANZISKA_WHEN_OFF\nask · cloud (ChatGPT via pi) · wake (WoL)", fillcolor="#E3F2FD", color="#1E88E5"];
+
+  // choose
+  choose [label="② Core.choose(state, text)\npaused? pinned (/life /money)? else the router", fillcolor="#EDE7F6", color="#5E35B1"];
+  router [label="Router.route(text, previous ≤15 min)\none AnyJev L0 decision · p per option", fillcolor="#FFF8E1", color="#F9A825"];
+  conf   [label="p ≥ 0.6?", shape=diamond, style="filled", fillcolor="#FFF8E1", color="#F9A825"];
+  ask    [label="buttons: which assistant?\n(top 4 options, likeliest first)", fillcolor="#E3F2FD", color="#1E88E5"];
+  iswf   [label="route is a\nworkflow?", shape=diamond, style="filled", fillcolor="#EDE7F6", color="#5E35B1"];
+  wf     [label="workflow_turn\nparams by one typed extraction → run in a thread\n→ Report + Proposals (never writes)", fillcolor="#EDE7F6", color="#5E35B1"];
+
+  // turn
+  sev    [label="③ several things?\nAnyJev yes/no, p ≥ 0.5", shape=diamond, style="filled", fillcolor="#FFF8E1", color="#F9A825"];
+  plan   [label="plan_turn: typed plan (≤4 steps, schema = grammar)\neach step → Core.delegate(route, request)\nreply = each answer under its label", fillcolor="#EDE7F6", color="#5E35B1"];
+  prep   [label="④ Core._turn prepares the run\nModels.for_route → local · Claude · cloud\nhistory (+ rolling summary) · thread of recent turns\nmemory view (index + 4 tools) · library / sandbox / bill tools\nhand_off · ask · Guard capability · Budget capability", fillcolor="#EDE7F6", color="#5E35B1"];
+  run    [label="⑤ agent.run (Pydantic AI loop)\nmodel request → tool calls → model request → … → text", fillcolor="#E8F5E9", color="#43A047"];
+  gpu    [label="GPU lock\n(gpu.Local)", shape=note, fillcolor="#FFF8E1", color="#F9A825"];
+  llm    [label="llama-server\n/v1/chat/completions", fillcolor="#FBE9E7", color="#F4511E"];
+  tool   [label="tool call\n(guard: loop check · taint · write?)", fillcolor="#FFEBEE", color="#E53935"];
+  svc    [label="service method\nLife · Money · Library · Memory …", fillcolor="#ECEFF1", color="#546E7A"];
+  db     [label="SQLite stores", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+  defer  [label="tainted write the user didn't ask for\n→ Proposal (button), not run", fillcolor="#FFEBEE", color="#E53935"];
+  hand   [label="hand_off(assistant)\n→ same message, other route, once", fillcolor="#EDE7F6", color="#5E35B1"];
+  check  [label="⑥ reply checks (route's CHECKS)\ndates · figures · links · searched · claims\nfail → sent back once; stop → fallback text", fillcolor="#FFEBEE", color="#E53935"];
+
+  // after
+  after  [label="⑦ after the reply\nturn log row (turns.sqlite) · history saved (conversations)\nold turns → rolling summary (background) · facts pass (background)\n💾 profile offers for lasting notes", fillcolor="#ECEFF1", color="#546E7A"];
+  reply  [label="⑧ Reply(text, route, actions, files)\nadapter renders: Telegram message + inline buttons\n(web: NDJSON 'reply' line)", fillcolor="#E3F2FD", color="#1E88E5"];
+  tap    [label="⑨ tap ✅ / ➕ / 💾 → Core.apply(state, n)\nthe Proposal's apply() runs the same tool without the model", fillcolor="#E3F2FD", color="#1E88E5"];
+
+  upd -> allow; allow -> up [label=" yes"]; up -> choose [label=" yes"]; up -> off [label=" no (box mode)"];
+  choose -> router [label=" auto"]; router -> conf; conf -> ask [label=" no"]; conf -> iswf [label=" yes"];
+  choose -> iswf [label=" pinned", style=dashed];
+  ask -> iswf [label=" tap", style=dashed];
+  iswf -> wf [label=" yes"]; iswf -> sev [label=" no"];
+  sev -> plan [label=" yes, ≥2 assistants"]; sev -> prep [label=" no"];
+  prep -> run; run -> gpu [dir=both, style=dashed]; gpu -> llm [dir=both, style=dashed];
+  run -> tool [dir=both]; tool -> svc [label=" allowed"]; svc -> db; tool -> defer [label=" tainted"];
+  run -> hand [style=dashed]; hand -> prep [style=dashed, constraint=false];
+  run -> check; check -> after; plan -> after [style=dashed]; wf -> reply [style=dashed];
+  after -> reply; reply -> tap; defer -> reply [style=dotted, label=" as buttons"];
+  {rank=same; run; gpu; llm}
+  {rank=same; tool; hand}
+  {rank=same; svc; defer}
+}

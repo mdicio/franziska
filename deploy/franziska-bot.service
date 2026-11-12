@@ -1,0 +1,22 @@
+# systemd user service for the Telegram bot. Install:
+#   mkdir -p ~/.config/systemd/user && cp deploy/franziska-bot.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now franziska-bot
+#   loginctl enable-linger $USER     # keep it running when you are logged out
+# Logs: journalctl --user -u franziska-bot -f
+[Unit]
+Description=Franziska Telegram bot
+After=network-online.target franziska-llm.service
+Wants=network-online.target franziska-llm.service
+
+[Service]
+# Your clone of the repo (the default assumes ~/franziska)
+WorkingDirectory=%h/franziska
+ExecStart=%h/.local/bin/uv run --env-file .env python -m franziska.bot
+# node (for /think) and uv live in ~/.local/bin
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PI_TELEMETRY=0 PI_SKIP_VERSION_CHECK=1
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

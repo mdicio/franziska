@@ -1,0 +1,27 @@
+// How you see what happened (obs.py, health.py, housekeeping.py, web/tools.py). Render: docs/diagrams/render.sh
+digraph observability {
+  graph [rankdir=LR, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.25, ranksep=0.6,
+         label="Observability: one run id from the journal to the traces", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  run [label="a run: message · tap ·\nworkflow · scheduled job\n(obs.root → run id = first 8 hex\nof the OpenTelemetry trace id)", fillcolor="#EDE7F6", color="#5E35B1"];
+
+  journal [label="journald\n'[3f2a91c0 life] turn life: 6.1 s, 3 tool calls'\njournalctl --user -u franziska-bot | grep 3f2a91c0", fillcolor="#ECEFF1", color="#546E7A"];
+  spans [label="OpenTelemetry spans\npydantic-ai instrumentation: agent run, each model\nrequest (messages, reasoning, tokens), each tool call\n+ ours: root, router decision, GPU wait, guard events", fillcolor="#ECEFF1", color="#546E7A"];
+  traces [label="traces.sqlite\nspans(trace_id, parent, name, ms, attrs, events)\n30 days · local only", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+  phoenix [label="Phoenix (optional)\nFRANZISKA_OTLP → :6006\nopened at /phoenix/ in the web UI", fillcolor="#FBE9E7", color="#F4511E", style="rounded,filled,dashed"];
+
+  turnlog [label="turns.sqlite\none row per answered message:\nroute · p · tools · stopped · ms · tokens", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+  health [label="health.sqlite\nrouter · calendar · mail · backup ·\nhousekeeping: ok / failing since", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+  maint [label="maintenance.sqlite\nwhat each nightly pass removed\n(/housekeeping)", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+  usage [label="usage.sqlite\ncloud / Claude tokens + cost\n(/usage)", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+
+  web [label="web UI\nData view · Datasette /sql/ ·\nSettings (services, .env knobs) ·\ncontext meter · 'show steps'", fillcolor="#E3F2FD", color="#1E88E5"];
+  reply [label="replies and the brief\n'⚠️ calendar: not synced since 14:05'", fillcolor="#E3F2FD", color="#1E88E5"];
+  evals [label="evals/ (week, bench, memory …)\nread the turn log and stores", fillcolor="#E8F5E9", color="#43A047"];
+
+  run -> journal; run -> spans -> traces; spans -> phoenix [style=dashed];
+  run -> turnlog; run -> health [style=dashed]; run -> usage [style=dashed];
+  traces -> web; turnlog -> web; maint -> web; health -> reply; turnlog -> evals;
+}

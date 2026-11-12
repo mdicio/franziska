@@ -1,0 +1,19 @@
+{
+  "name": "Franziska",
+  "short_name": "Franziska",
+  "description": "Your local-first secretary and finance assistant.",
+  "start_url": "/#chat",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ee",
+  "theme_color": "#2f6f62",
+  "icons": [
+    {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ],
+  "shortcuts": [
+    {"name": "Today", "url": "/#today"},
+    {"name": "Money", "url": "/#money"}
+  ]
+}

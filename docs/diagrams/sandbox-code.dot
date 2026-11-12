@@ -1,0 +1,40 @@
+// Code execution: run_python and coding jobs (sandbox.py, code.py, pc.py). Render: docs/diagrams/render.sh
+digraph sandbox {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.3, ranksep=0.4, compound=true,
+         label="No agent gets a host shell: code runs only inside the sandbox", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  subgraph cluster_box {
+    label="Sandbox.run / Sandbox.shell: two layers, fails closed if either is missing"; style="rounded,filled"; fillcolor="#FFF8F8"; color="#EF9A9A"; fontsize=13;
+    sd [label="systemd-run --user (transient unit)\nMemoryMax · MemorySwapMax=0 · CPUQuota ·\nTasksMax · RuntimeMaxSec · output cap", fillcolor="#FFEBEE", color="#E53935"];
+    bw [label="bubblewrap\nempty root · /usr + libs read-only · fresh /tmp ·\nno network namespace · no $HOME · only the mounts given", fillcolor="#FFEBEE", color="#E53935"];
+    venv [label="dedicated interpreter (read-only)\nsandbox-venv: pandas · matplotlib · openpyxl · pypdf\n(bootstrap once by you; code never installs)", fillcolor="#ECEFF1", color="#546E7A"];
+    {rank=same; sd -> bw -> venv;}
+  }
+
+  subgraph cluster_py {
+    label="Level 1 · run_python(script, inputs, documents): money and chat, local model only"; style="rounded,filled"; fillcolor="#F4FBF4"; color="#A5D6A7"; fontsize=13;
+    p1 [label="agent writes a script\n+ text inputs (rows from query_ledger,\npasted CSV) + library doc numbers", fillcolor="#E8F5E9", color="#43A047"];
+    p2 [label="copied in: /in (read-only)\n/in/doc<N>.<ext> filtered by privacy\nwritable /work · 2 GB · 64 tasks · 120 s", fillcolor="#ECEFF1", color="#546E7A"];
+    p3 [label="/work/out/* copied out\n→ photos on Telegram, inline in the web chat\n(kept 30 days); documents taint the run", fillcolor="#E3F2FD", color="#1E88E5"];
+    {rank=same; p1 -> p2 -> p3;}
+  }
+
+  subgraph cluster_job {
+    label="Level 3 · coding jobs (/code, the web Code view, or a 🛠 button from an untainted pc turn)"; style="rounded,filled"; fillcolor="#F8F5FD"; color="#B39DDB"; fontsize=13;
+    j1 [label="row in code.sqlite\n+ unit franziska-code-<id>\n(survives a bot restart,\none job at a time)", fillcolor="#EDE7F6", color="#5E35B1"];
+    j2 [label="git clone --no-hardlinks\n--no-checkout of an allowlisted\nrepo (or a new 'scratch' one):\nnot a worktree, no .env, no remote", fillcolor="#ECEFF1", color="#546E7A"];
+    j3 [label="loop on the local model (GPU lock per step)\none tool: bash · each command a fresh\nprocess in Sandbox.shell (/repo rw, venv ro)\n4 GB · 256 tasks · 300 s · ≤60 steps", fillcolor="#E8F5E9", color="#43A047"];
+    j4 [label="in the sandbox: commit,\nrun the tests, write a\ngit bundle", fillcolor="#ECEFF1", color="#546E7A"];
+    j5 [label="host: fetch bundle (fsck on) as\nbranch franziska/job-<id>; diff with\n--no-ext-diff --no-textconv", fillcolor="#ECEFF1", color="#546E7A"];
+    j6 [label="you review: report + diff\n✅ merge · 💬 change · 🗑 discard\n(🔄 restart after merging Franziska)", fillcolor="#E3F2FD", color="#1E88E5"];
+    {rank=same; j1 -> j2 -> j3;}
+    j3 -> j4;
+    {rank=same; j6 -> j5 -> j4 [dir=back];}
+  }
+  note [label="no host git ever runs inside a tree the job wrote: a planted core.fsmonitor,\nalias or attribute can't execute on the host or hide a change · nothing pushes", shape=note, fillcolor="#FFFFFF", color="#B39DDB", fontsize=10];
+
+  p2 -> sd [lhead=cluster_box, label=" runs in"]; j3 -> bw [lhead=cluster_box, label=" every command"];
+  j6 -> note [style=invis];
+}

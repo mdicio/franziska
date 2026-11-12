@@ -1,0 +1,16 @@
+# systemd user service for Phoenix, the LLM trace viewer (franziska/web/tools.py). Not enabled: the web UI's
+# Telemetry link starts it, and it runs until stopped (there, or systemctl --user stop franziska-phoenix). Install:
+#   cp deploy/franziska-phoenix.service ~/.config/systemd/user/ && systemctl --user daemon-reload
+# The bot and the web send it their spans with FRANZISKA_OTLP=http://localhost:6006/v1/traces (.env).
+# Its UI is on the loopback only, reached through the web UI at /phoenix/ (same sign-in); data in ~/.phoenix.
+# Logs: journalctl --user -u franziska-phoenix -f
+[Unit]
+Description=Phoenix trace viewer for Franziska
+
+[Service]
+ExecStart=%h/.local/bin/uvx --from arize-phoenix==21.0.0 phoenix serve
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PHOENIX_HOST=127.0.0.1 PHOENIX_PORT=6006 PHOENIX_GRPC_PORT=4317 PHOENIX_HOST_ROOT_PATH=/phoenix
+Environment=PHOENIX_TELEMETRY_ENABLED=false
+Restart=on-failure
+RestartSec=10

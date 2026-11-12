@@ -1,0 +1,32 @@
+// How an AnyJev decision is made (router.py, jev_server.py). Render: docs/diagrams/render.sh
+digraph router {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.3, ranksep=0.3,
+         label="AnyJev L0: a classification read from logprobs, no text generated", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.08"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  q [label="Question\n'Which assistant should handle this message?'\noptions = ROUTES + workflows (+ mail, pc)\neach 'key: description'", fillcolor="#FFF8E1", color="#F9A825"];
+  ctx [label="State\nthe message\n(+ previous message, ≤15 min)", fillcolor="#E3F2FD", color="#1E88E5"];
+  render [label="Render prompts\nGGUF's own chat template + vocab\n(vocab-only load; on the box a 16 MB\ntensor-free export)", fillcolor="#ECEFF1", color="#546E7A"];
+  rot [label="One prompt per rotation\nof the options' order\n(4 options → 4 short prefills)", fillcolor="#ECEFF1", color="#546E7A"];
+  srv [label="llama-server /completion\ntoken ids in, n_predict = 1\nn_probs = 50 (top-50 logprobs)", fillcolor="#FBE9E7", color="#F4511E"];
+  lp [label="Logprob of each option's\nlabel token, matched by token id\n(outside top-50 → bounded)", fillcolor="#ECEFF1", color="#546E7A"];
+  prior [label="Divide out the content-free prior\n(the model's preference for a label\nwith no message), average rotations", fillcolor="#ECEFF1", color="#546E7A"];
+  dist [label="Route(name, p, probs)\ne.g. life 0.93 · money 0.04 · …", fillcolor="#FFF8E1", color="#F9A825"];
+  thr [label="p ≥ ROUTER_MIN_P (0.6)?", shape=diamond, style="filled", fillcolor="#FFF8E1", color="#F9A825"];
+  go [label="answer on that route", fillcolor="#E8F5E9", color="#43A047"];
+  btn [label="ask with buttons", fillcolor="#E3F2FD", color="#1E88E5"];
+
+  q -> render; ctx -> render; render -> rot -> srv -> lp -> prior -> dist -> thr;
+  thr -> go [label=" yes"]; thr -> btn [label=" no"];
+
+  other [shape=plaintext, style="", label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="5" color="#F9A825">
+    <tr><td bgcolor="#FFF8E1" colspan="2"><b>The same machinery, other questions</b></td></tr>
+    <tr><td align="left">Router.choose / choose_many</td><td align="left">payee → spending group (categorise)</td></tr>
+    <tr><td align="left">Router.priority</td><td align="left">new task: high · normal · low</td></tr>
+    <tr><td align="left">Router.reminder_rules</td><td align="left">which reminder rule a task follows</td></tr>
+    <tr><td align="left">Router.decide (yes/no)</td><td align="left">several things? · authorize a write ·<br/>reply claims done? · lasting fact? ·<br/>mail triage · mail tool groups · mail_bills filters</td></tr>
+  </table>>];
+  dist -> other [style=dotted, arrowhead=none];
+  {rank=same; dist; other}
+}

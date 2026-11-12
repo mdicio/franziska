@@ -1,0 +1,14 @@
+// The design rule: use the lowest rung that does the job (DESIGN §5). Render: docs/diagrams/render.sh
+digraph rungs {
+  graph [rankdir=BT, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.3, ranksep=0.25,
+         label="The ladder: every rung up is slower and fails in more ways", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.2,0.1", width=4.3];
+  edge  [color="#B0BEC5", arrowsize=0.8, penwidth=2];
+
+  r1 [label=<<b>1 · Code</b>  <i>(ms · no model · can't invent)</i><br/>deterministic Python over the stores and APIs<br/><font point-size="10" color="#455A64">reminders, brief, bill matching, merchant parsing, summaries,<br/>Gmail search, PDF text, calendar mirror</font>>, fillcolor="#ECEFF1", color="#546E7A"];
+  r2 [label=<<b>2 · Decision</b>  <i>(~1 s · can't produce malformed output)</i> (AnyJev)<br/>one typed question, read from next-token logprobs → p<br/><font point-size="10" color="#455A64">routing, task priority, mail triage, "several things?",<br/>"did the user ask for this write?", payee spending group</font>>, fillcolor="#FFF8E1", color="#F9A825"];
+  r3 [label=<<b>3 · Extraction</b>  <i>(seconds · validated against the source)</i><br/>one Pydantic AI call with a typed output, checked by code<br/><font point-size="10" color="#455A64">bill fields from an email, workflow params, the plan,<br/>document cards, the market report (schema as grammar)</font>>, fillcolor="#EDE7F6", color="#5E35B1"];
+  r4 [label=<<b>4 · Agent</b>  <i>(4–15 s · guarded tool loop)</i><br/>a Pydantic AI loop with ~10 tools over one service<br/><font point-size="10" color="#455A64">"sposta il dentista a venerdì", "quanto ho speso da Deliveroo?",<br/>the mail agent over gog MCP</font>>, fillcolor="#E8F5E9", color="#43A047"];
+  r5 [label=<<b>5 · Open-ended</b>  <i>(minutes · isolated · you review the result)</i><br/>an agent with a shell-shaped tool, in a sandbox<br/><font point-size="10" color="#455A64">coding jobs (one bash tool, mini-swe-agent's shape),<br/>run_python on copied inputs</font>>, fillcolor="#FBE9E7", color="#F4511E"];
+  r1 -> r2 -> r3 -> r4 -> r5;
+}

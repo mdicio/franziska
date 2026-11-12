@@ -1,0 +1,119 @@
+// Franziska: the whole system on one page, as layers. Render: docs/diagrams/render.sh
+// Colours (same in every diagram): blue = ways in / adapters, purple = core orchestration, amber = AnyJev decision
+// (a probability, no text generated), green = LLM agent loop, grey = deterministic code, white cylinder = store,
+// orange = model runtime, dashed = optional or outside service, red = guard / privacy boundary.
+digraph overview {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.28, ranksep=0.5, 
+         compound=true, label="Franziska: system overview (layers, top to bottom)", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  subgraph cluster_in {
+    label="1 · Ways in"; style="rounded,filled"; fillcolor="#F5F9FF"; color="#90CAF9"; fontsize=13;
+    tg   [label="Telegram app\n(text, voice, files, buttons)", fillcolor="#E3F2FD", color="#1E88E5"];
+    pwa  [label="Web UI (PWA)\nphone / laptop over Tailscale", fillcolor="#E3F2FD", color="#1E88E5"];
+    mcpc [label="MCP clients\nClaude Code · pi · Codex", fillcolor="#E3F2FD", color="#1E88E5"];
+    {rank=same; edge [style=invis]; tg -> pwa -> mcpc;}
+  }
+
+  subgraph cluster_adapters {
+    label="2 · Adapters (long-running processes)"; style="rounded,filled"; fillcolor="#F5F9FF"; color="#90CAF9"; fontsize=13;
+    bot  [label="bot.py · franziska-bot\npython-telegram-bot, long polling\n+ every scheduled job", fillcolor="#E3F2FD", color="#1E88E5"];
+    web  [label="web/app.py · franziska-web\nFastAPI + uvicorn :8765\nNDJSON streaming", fillcolor="#E3F2FD", color="#1E88E5"];
+    mcps [label="mcp_server.py\nMCP over stdio\nschedule + notes only", fillcolor="#E3F2FD", color="#1E88E5"];
+    {rank=same; edge [style=invis]; bot -> web -> mcps;}
+  }
+
+  subgraph cluster_core {
+    label="3 · Core (core.py): one message in, one Reply out"; style="rounded,filled"; fillcolor="#F8F5FD"; color="#B39DDB"; fontsize=13;
+    router  [label="Router\nAnyJev: which assistant?", fillcolor="#FFF8E1", color="#F9A825"];
+    planner [label="Planner (plan.py)\nseveral things? → steps", fillcolor="#EDE7F6", color="#5E35B1"];
+    turn    [label="turn()\nhistory · thread · memory view", fillcolor="#EDE7F6", color="#5E35B1"];
+    guard   [label="Guard (guards.py)\ntaint · authorize · checks", fillcolor="#FFEBEE", color="#E53935"];
+    deleg   [label="Delegation\nhand_off · ask", fillcolor="#EDE7F6", color="#5E35B1"];
+    {rank=same; edge [style=invis]; router -> planner -> turn -> guard -> deleg;}
+  }
+
+  subgraph cluster_agents {
+    label="4 · Assistants (Pydantic AI agents) and workflows (fixed Python pipelines)"; style="rounded,filled"; fillcolor="#F4FBF4"; color="#A5D6A7"; fontsize=13;
+    a_life  [label="life\nsecretary", fillcolor="#E8F5E9", color="#43A047"];
+    a_money [label="money\nfinance", fillcolor="#E8F5E9", color="#43A047"];
+    a_mail  [label="mail\nGmail · Drive (gog)", fillcolor="#E8F5E9", color="#43A047"];
+    a_web   [label="web\nsearch + read", fillcolor="#E8F5E9", color="#43A047"];
+    a_pc    [label="pc\nthis computer", fillcolor="#E8F5E9", color="#43A047"];
+    a_chat  [label="chat\nno data tools", fillcolor="#E8F5E9", color="#43A047"];
+    wf      [label="workflows\nmail_bills · categorise · markets", fillcolor="#EDE7F6", color="#5E35B1"];
+    {rank=same; edge [style=invis]; a_life -> a_money -> a_mail -> a_web -> a_pc -> a_chat -> wf;}
+  }
+
+  subgraph cluster_services {
+    label="5 · Services: deterministic code, the only owners of data and rules"; style="rounded,filled"; fillcolor="#F7F9FA"; color="#B0BEC5"; fontsize=13;
+    s_life  [label="Life\ntasks · notes · calendar", fillcolor="#ECEFF1", color="#546E7A"];
+    s_money [label="Money · Portfolio\nledger · DEGIRO", fillcolor="#ECEFF1", color="#546E7A"];
+    s_mem   [label="MemoryStore · TurnLog\nlearned facts · past turns", fillcolor="#ECEFF1", color="#546E7A"];
+    s_lib   [label="Library\ndocuments, hybrid search", fillcolor="#ECEFF1", color="#546E7A"];
+    s_mkt   [label="Market\nfigures · news · PDF", fillcolor="#ECEFF1", color="#546E7A"];
+    s_box   [label="Sandbox · Jobs\nbubblewrap + systemd", fillcolor="#ECEFF1", color="#546E7A"];
+    {rank=same; edge [style=invis]; s_life -> s_money -> s_lib -> s_mem -> s_box -> s_mkt;}
+  }
+
+  subgraph cluster_stores {
+    label="6 · Stores: ~/.local/share/franziska (SQLite + markdown, never in git)"; style="rounded,filled"; fillcolor="#FFFFFF"; color="#78909C"; fontsize=13;
+    node [shape=cylinder, style="filled", fillcolor="#FFFFFF", color="#37474F", fontsize=10, margin="0.1,0.05"];
+    d_life   [label="life.sqlite"];
+    d_ledger [label="ledger.sqlite"];
+    d_turns  [label="turns.sqlite\nmemory/*.md"];
+    d_lib    [label="library.sqlite"];
+    d_mkt    [label="market.sqlite"];
+    d_obs    [label="traces · usage ·\nevents · health …"];
+    {rank=same; edge [style=invis]; d_life -> d_ledger -> d_lib -> d_turns -> d_obs -> d_mkt;}
+  }
+
+  subgraph cluster_models {
+    label="Models"; style="rounded,filled"; fillcolor="#FFF7F4"; color="#FFAB91"; fontsize=13;
+    llm    [label="llama-server :8080\ngemma-4-26B-A4B on the GPU\none request at a time (gpu.py)", fillcolor="#FBE9E7", color="#F4511E"];
+    emb    [label="llama-server :8081\nEmbeddingGemma-300M, CPU", fillcolor="#FBE9E7", color="#F4511E"];
+    whisp  [label="faster-whisper\nvoice → text, CPU", fillcolor="#FBE9E7", color="#F4511E"];
+    claude [label="Claude via Agent SDK\n(optional, your plan)", fillcolor="#FBE9E7", color="#F4511E", style="rounded,filled,dashed"];
+    cloud  [label="OpenRouter / DeepInfra\n(optional, public routes)", fillcolor="#FBE9E7", color="#F4511E", style="rounded,filled,dashed"];
+  }
+
+  subgraph cluster_ext {
+    label="Outside services"; style="rounded,dashed"; color="#9E9E9E"; fontsize=13;
+    node [style="rounded,filled,dashed", fillcolor="#FAFAFA", color="#9E9E9E"];
+    google [label="Google Calendar · Gmail\nDrive · Docs · Sheets"];
+    searx  [label="SearXNG (Docker, local)\n→ search engines"];
+    pub    [label="Yahoo · ECB · FRED\nRSS · Nasdaq"];
+  }
+
+  // layer to layer
+  tg -> bot [label=" Bot API"]; pwa -> web [label=" HTTPS"]; mcpc -> mcps [label=" stdio"];
+  bot -> turn [ltail=cluster_adapters, lhead=cluster_core, label=" Core.choose / turn / apply", penwidth=2];
+  turn -> a_money [ltail=cluster_core, lhead=cluster_agents, label=" agent.run(model, deps, toolsets, guard)", penwidth=2];
+  a_money -> s_money [ltail=cluster_agents, lhead=cluster_services, label=" tools = thin wrappers over service methods", penwidth=2];
+  s_money -> d_ledger [ltail=cluster_services, lhead=cluster_stores, penwidth=2];
+  mcps -> s_life [label=" same Life methods", color="#1E88E5", fontcolor="#1565C0"];
+
+  // inside the core
+
+
+  // to the models
+  router -> llm [style=dashed, color="#F9A825", fontcolor="#B26A00", label=" next-token logprobs", constraint=false];
+  a_life -> llm [ltail=cluster_agents, label=" OpenAI-compatible\n chat completions", color="#F4511E", fontcolor="#BF360C"];
+  s_lib -> emb [style=dashed, label=" embeddings", color="#F4511E", fontcolor="#BF360C", constraint=false];
+
+  // outside
+  s_life -> google [label=" appointments", style=dashed, constraint=false];
+  a_mail -> google [style=dashed, constraint=false];
+  a_web -> searx [style=dashed, constraint=false];
+  s_mkt -> pub [style=dashed, constraint=false];
+
+  // ranks and columns (invisible): each item sits above the one it talks to most
+  edge [style=invis];
+  bot -> router; bot -> planner; web -> turn; web -> guard; mcps -> deleg;
+  router -> a_life; planner -> a_money; turn -> a_mail; turn -> a_web; guard -> a_pc; deleg -> a_chat; deleg -> wf;
+  a_life -> s_life; a_money -> s_money; a_mail -> s_lib; a_web -> s_mem; a_pc -> s_box; wf -> s_mkt;
+  s_life -> d_life; s_money -> d_ledger; s_lib -> d_lib; s_mem -> d_turns; s_box -> d_obs; s_mkt -> d_mkt;
+  mcps -> llm -> emb -> {whisp claude cloud};
+  deleg -> google -> searx -> pub;
+}

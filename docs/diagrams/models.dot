@@ -1,0 +1,36 @@
+// Which model answers a route (llm.Models.for_route) and what that run may see. Render: docs/diagrams/render.sh
+digraph models {
+  graph [rankdir=LR, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.3, ranksep=0.5,
+         label="Model selection per route (llm.py) and the privacy view that follows it", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.08"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  r [label="Models.for_route(route)\n(or for_job: plan · summary ·\nlearn · describe · code)", fillcolor="#EDE7F6", color="#5E35B1"];
+  c1 [label="route in\nFRANZISKA_CLAUDE_ROUTES?\n(⊆ CLAUDE_OK)", shape=diamond, style="filled", fillcolor="#EDE7F6", color="#5E35B1", fontsize=10];
+  c2 [label="route in\nFRANZISKA_CLOUD_ROUTES?\n(⊆ CLOUD_OK)", shape=diamond, style="filled", fillcolor="#EDE7F6", color="#5E35B1", fontsize=10];
+
+  claude [label="Metered(FallbackModel(\n  ClaudeCodeModel, local))\nclaude.py: Claude Code process,\nno built-in tools, our tools via\nin-process MCP, plan login only", fillcolor="#FBE9E7", color="#F4511E"];
+  cloud [label="Metered(FallbackModel(\n  OpenRouter | DeepInfra, local))\nOpenRouter: zero-retention,\nno training, no 4-bit", fillcolor="#FBE9E7", color="#F4511E"];
+  local [label="gpu.Local(OpenAIChatModel)\nllama-server (FRANZISKA_BASE_URL)\nelse OllamaModel\ntemperature 0 · thinking per setting", fillcolor="#FBE9E7", color="#F4511E"];
+  lock [label="GPU lock: one local\nrequest at a time,\nacross processes\n(Busy after WAIT_S)", shape=note, fillcolor="#FFF8E1", color="#F9A825"];
+  usage [label="usage.sqlite\ntokens + cost per request\n(/usage)", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+
+  w_local [label="where = local\nsees privacy.SEES[route]", fillcolor="#E8F5E9", color="#43A047"];
+  w_claude [label="where = claude\nsees SEES ∩ {public, personal}\nnever money or mail", fillcolor="#FFEBEE", color="#E53935"];
+  w_cloud [label="where = cloud\nsees SEES ∩ CLOUD_SEES (nothing)\nno profile memory, no run_python", fillcolor="#FFEBEE", color="#E53935"];
+
+  r -> c1; c1 -> claude [label=" yes"]; c1 -> c2 [label=" no"];
+  c2 -> cloud [label=" yes"]; c2 -> local [label=" no"];
+  claude -> local [style=dashed, label=" call fails\n (plan limit)"]; cloud -> local [style=dashed, label=" API error"];
+  local -> lock [style=dotted, arrowhead=none];
+  claude -> usage [style=dotted]; cloud -> usage [style=dotted];
+  claude -> w_claude [color="#E53935"]; cloud -> w_cloud [color="#E53935"]; local -> w_local [color="#43A047"];
+
+  allow [shape=plaintext, style="", label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="5" color="#90A4AE">
+    <tr><td bgcolor="#ECEFF1"><b>allowlist (in code)</b></td><td bgcolor="#ECEFF1"><b>routes and jobs</b></td></tr>
+    <tr><td align="left">CLAUDE_OK</td><td align="left">life · chat · web · pc · plan · summary · learn · code</td></tr>
+    <tr><td align="left">CLOUD_OK</td><td align="left">chat · web · markets</td></tr>
+    <tr><td align="left">always local</td><td align="left">money · mail · workflows · router · describe</td></tr>
+  </table>>];
+  r -> allow [style=invis];
+}

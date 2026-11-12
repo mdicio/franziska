@@ -1,0 +1,43 @@
+// Mail: triage job, the open-ended mail agent, the mail_bills workflow (google/gmail.py, mail/, workflows/)
+digraph mail {
+  graph [rankdir=TB, fontname="Noto Sans", bgcolor="white", pad=0.35, nodesep=0.28, ranksep=0.4,
+         label="✉️ Mail: three paths, all on the local model, nothing ever sent from your account", labelloc=t, fontsize=20];
+  node  [fontname="Noto Sans", fontsize=11, shape=box, style="rounded,filled", penwidth=1.3, margin="0.16,0.07"];
+  edge  [fontname="Noto Sans", fontsize=10, color="#546E7A", arrowsize=0.75, penwidth=1.2];
+
+  gmail [label="Gmail\n(your Google account)", fillcolor="#FAFAFA", color="#9E9E9E", style="rounded,filled,dashed"];
+
+  subgraph cluster_triage {
+    label="A · Triage (job every 10 min, mail/client.py)"; style="rounded,filled"; fillcolor="#F7F9FA"; color="#B0BEC5"; fontsize=13;
+    fetch [label="fetch new headers\nREST (google/gmail.py), own OAuth\nsender · subject · ~200-char snippet\n(promotions/social skipped)", fillcolor="#ECEFF1", color="#546E7A"];
+    tri [label="2 AnyJev decisions per message\nkind: action · bill · appointment ·\nreceipt · newsletter · personal\nneeds you within days? yes/no", fillcolor="#FFF8E1", color="#F9A825"];
+    mstore [label="life.sqlite: mail\n(headers only, 180 days)", shape=cylinder, fillcolor="#FFFFFF", color="#37474F"];
+    push [label="push · brief (24 h) · /mail (3 days)", fillcolor="#E3F2FD", color="#1E88E5"];
+    {rank=same; fetch -> tri -> mstore -> push;}
+  }
+
+  subgraph cluster_agent {
+    label="B · The mail route (mail/agent.py): 'trova la mail di Luca e rispondi che va bene'"; style="rounded,filled"; fillcolor="#F4FBF4"; color="#A5D6A7"; fontsize=13;
+    sel [label="tool routing: AnyJev yes/no per group\n(p ≥ 0.3): draft · organise · files ·\nschedule; more_tools adds one mid-run", fillcolor="#FFF8E1", color="#F9A825"];
+    ma [label="Pydantic AI agent (local model)\ntainted by every read: writes other\nthan drafts become buttons", fillcolor="#E8F5E9", color="#43A047"];
+    gog [label="gog mcp (gogcli, stdio)\n--gmail-no-send · no send tool ·\nno permanent delete\nGmail · Drive · Docs · Sheets", fillcolor="#ECEFF1", color="#546E7A"];
+    lifemcp [label="life MCP server\n(a date in a mail → task)", fillcolor="#ECEFF1", color="#546E7A"];
+    attach [label="read_attachment · search_attachment ·\nindex_attachments → library\n(pdftotext / OCR, locally)", fillcolor="#ECEFF1", color="#546E7A"];
+    sel -> ma; ma -> gog; ma -> lifemcp; ma -> attach; {rank=same; gog; lifemcp; attach}
+  }
+
+  subgraph cluster_wf {
+    label="C · mail_bills workflow: 'bollette del condominio dell'ultimo mese'"; style="rounded,filled"; fillcolor="#F8F5FD"; color="#B39DDB"; fontsize=13;
+    s1 [label="① search threads\n(topic = Gmail query)", fillcolor="#ECEFF1", color="#546E7A"];
+    s2 [label="② group by subject\n(Re:/Fwd:/PEC stripped)", fillcolor="#ECEFF1", color="#546E7A"];
+    s3 [label="③ decide, cheapest first\nsubject has topic word → yes\nelse AnyJev; bill / notice / other", fillcolor="#FFF8E1", color="#F9A825"];
+    s4 [label="④ read bodies + PDFs lazily\n(token budget, likely names first)", fillcolor="#ECEFF1", color="#546E7A"];
+    s5 [label="⑤ typed extraction per thread\nissuer · amount · due date\n(amount must be in the text)", fillcolor="#EDE7F6", color="#5E35B1"];
+    s6 [label="⑥ report by due date\n➕ button → Money.add_bill", fillcolor="#E3F2FD", color="#1E88E5"];
+    {rank=same; s1 -> s2 -> s3 -> s4 -> s5 -> s6;}
+  }
+
+  gmail -> fetch [lhead=cluster_triage]; gmail -> sel [lhead=cluster_agent, style=dashed, label=" via gog"];
+  push -> sel [style=invis]; gog -> s3 [style=invis];
+  gmail -> s1 [lhead=cluster_wf, style=dashed, label=" REST", constraint=false];
+}
