@@ -26,7 +26,8 @@ from types import SimpleNamespace
 import httpx
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelMessage, NativeOutput, RunContext
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ThinkingPart, ToolCallPart, UserPromptPart
+from pydantic_ai.messages import (ModelRequest, ModelResponse, TextPart, ThinkingPart, ToolCallPart, ToolReturnPart,
+                                  UserPromptPart)
 
 from franziska import consolidate, housekeeping, summary
 from franziska.budget import Budget
@@ -180,6 +181,19 @@ def _steps(messages: list[ModelMessage]) -> list[str]:
             elif isinstance(part, ToolCallPart):
                 out.append(f"🔧 {part.tool_name}({' '.join(part.args_as_json_str().split())[:120]})")
     return out
+
+
+def _earlier(turns: list[list[ModelMessage]]) -> str:
+    """What a route's own history shows as fact, for its reply checks (Guard.earlier): the user's messages (with a
+    document they sent) and the tool results. Not its own replies: those are prose."""
+    out = []
+    for m in (m for turn in turns for m in turn if isinstance(m, ModelRequest)):
+        for part in m.parts:
+            if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                out.append(part.content)
+            elif isinstance(part, ToolReturnPart):
+                out.append(part.model_response_str())
+    return "\n".join(out)
 
 
 @dataclass(frozen=True)
@@ -462,14 +476,19 @@ class Core:
             for step in steps:
                 where = self.models.where(self.models.for_route(step.assistant))
                 classes = privacy_rules.where_sees(step.assistant, where)
-                # A step off this machine gets the earlier results it may see (a money figure never reaches Claude).
+                # A step off this machine gets the earlier results it may see (a money figure never reaches Claude);
+                # one that needs a result it may not see runs here instead ('se più di 100 euro', life on Claude after
+                # money: 'più di 100 euro di cosa?', 2026-11-12).
                 seen = [r for r in results if where == "local" or privacy_rules.HOLDS.get(r.route) in classes]
+                local = where != "local" and step.uses_previous and step.assistant != "web" and len(seen) < len(results)
+                if local:
+                    where, seen = "local", results
                 request = plan.with_results(step, [(self.labels[r.route], r.text) for r in seen])
                 used = step.uses_previous and step.assistant != "web"
                 results.append(await self.delegate(step.assistant, request,
                                                    tainted=used and any(r.tainted for r in seen), said=text,
                                                    context=self._thread(chat_id, state, step.assistant, where,
-                                                                        history=False)))
+                                                                        history=False), local=local))
                 if results[-1].stopped == "busy":
                     break
         reply = "\n\n".join(f"{self.labels[r.route]} · {r.text}" for r in results)
@@ -501,11 +520,13 @@ class Core:
         return {k: self.assistants[k] for k in (modules.REGISTRY[route].asks if route in modules.REGISTRY else ()) if k in self.assistants
                 and (classes is None or privacy_rules.HOLDS.get(k) in classes)}
 
-    async def _agent(self, route: str, text: str, said: str | None = None, previous: str | None = None):
+    async def _agent(self, route: str, text: str, said: str | None = None, previous: str | None = None,
+                     local: bool = False):
         """`route`'s agent, its deps and model for the message `text`, and where that model runs: 'local', 'claude'
         or 'cloud' (llm.Models.where), which decides what the run may see.
-        `said`: the user's own words in `text`; `previous`: their last mail message, for a follow-up's tool groups."""
-        model = self.models.for_route(route)
+        `said`: the user's own words in `text`; `previous`: their last mail message, for a follow-up's tool groups.
+        `local`: the local model whatever the route's setting (_hidden_follow_up)."""
+        model = self.models.local if local else self.models.for_route(route)
         where = self.models.where(model)
         if (outside := modules.REGISTRY.get(route)) and outside.build:  # FRANZISKA_MODULES
             agent, deps = outside.build(self, text, said)
@@ -586,6 +607,27 @@ class Core:
             problems += [f"{route}: its rules name {n}, which it doesn't have" for n in sorted(named - names)]
         return problems
 
+    def _hidden_follow_up(self, chat_id: int, state: dict, route: str) -> str | None:
+        """The route whose data the turn just before holds, when this message follows it up and `route`'s model may
+        not see that data (money found a bill, then life on Claude gets 'ricordami di pagarla' and asks 'pagare
+        cosa?', 2026-11-12); else None. Such a turn runs on the local model, whose thread shows the turn just before
+        whatever its class (privacy.FOLLOW_UP), and is logged as seen as that route (turns.seen_as) and kept out of
+        the route's history: what it saw never reaches the route's own model later."""
+        where = self.models.where(self.models.for_route(route))
+        last = state.get("last")
+        if (where == "local" or route == "web" or not privacy_rules.FOLLOW_UP or not last or len(last) < 3
+                or clock.time() - last[2] > FOLLOW_UP_S):
+            return None
+        newest = self.turns.thread(chat_id, 1, self.life.now() - timedelta(hours=THREAD_HOURS))
+        classes = privacy_rules.where_sees(route, where)
+        return next((r for r in newest[-1][1] if privacy_rules.HOLDS.get(r) not in classes), None) if newest else None
+
+    def _hidden_from(self, to: str, route: str) -> bool:
+        """Whether `to`'s model may not see what `route` holds (money asking life on Claude, its request carrying a
+        figure): that ask runs on the local model."""
+        where = self.models.where(self.models.for_route(to))
+        return where != "local" and privacy_rules.HOLDS.get(route) not in privacy_rules.where_sees(to, where)
+
     def _thread(self, chat_id: int, state: dict, route: str, where: str, history: bool = True) -> str:
         """The chat's latest turns as a run on `route` may see them (privacy.py): what the user said to which
         assistant, what it answered, the documents they sent. Histories are per assistant, so without it a follow-up
@@ -627,7 +669,11 @@ class Core:
                     tainted: bool, hand_offs: dict[str, str], doc: int | None = None) -> Reply:
         last = state.get("last")
         previous = last[1] if last and last[0] == "mail" and clock.time() - last[2] < FOLLOW_UP_S else None
-        agent, deps, model, where = await self._agent(route, text, said, previous)
+        hidden = self._hidden_follow_up(chat_id, state, route)
+        if hidden:
+            log.info("follow-up of a %s turn %s's model may not see: on the local model", hidden, route)
+            obs.event("follow_up.local", route=route, seen_as=hidden)
+        agent, deps, model, where = await self._agent(route, text, said, previous, local=bool(hidden))
         cloud = where == "cloud"
         turns: list[list[ModelMessage]] = state.setdefault(("history", route), [])
         view = self._view(route, text if said is None else said, where)
@@ -636,6 +682,7 @@ class Core:
         words = text if said is None else said  # the user's own words: what may authorize a write (_authorizer)
         guard = guards.Guard(text, self.life.now(), checks=guards.CHECKS.get(route, ()), tainted=tainted,
                              defer=self._defer(route, deps), authorize=self._authorizer(words))
+        guard.earlier = _earlier(turns)
         artifacts: list[Path] = []
         if isinstance(deps, pc.PC):  # its sent files go with the reply; no coding job once the run read content
             deps.files, deps.tainted = artifacts, lambda: guard.tainted
@@ -650,7 +697,8 @@ class Core:
                 if len(asked) >= delegation.MAX_ASKS:
                     return (f"Not asked: at most {delegation.MAX_ASKS} requests to other assistants per message. "
                             "Answer with what you have.")
-                step = await self.delegate(to, request, tainted=guard.tainted, said=words)
+                step = await self.delegate(to, request, tainted=guard.tainted, said=words,
+                                           local=self._hidden_from(to, route) or bool(hidden))
                 asked.append(step)
                 guard.sources += step.sources  # what the answer rests on backs the reply, not its wording
                 if step.tainted and not guard.tainted:  # its answer carries mail or page content: writes are buttons
@@ -669,7 +717,7 @@ class Core:
             ms = int((clock.time() - started) * 1000)
             turn_id = self.turns.add(chat_id, route, text, reply, p=p, stopped=stopped,
                                      tools=[dataclasses.asdict(c) for c in guard.calls], ms=ms, tokens=tokens,
-                                     said=said, doc=doc)
+                                     said=said, doc=doc, seen_as=hidden)
             for step in asked:  # under the turn that asked, hidden from the chat (turns.recent)
                 self.turns.add(chat_id, step.route, step.request, step.text, stopped=step.stopped, tools=step.tools,
                                ms=step.ms, tokens=step.tokens, parent=turn_id)
@@ -745,9 +793,10 @@ class Core:
         log_turn(result.output, "context: history dropped" if dropped else None, tokens)
         if dropped:
             turns.clear()
-        turns.append(result.new_messages())
         state["context"] = tokens
-        self._age(chat_id, state, route, turns, tokens)
+        if not hidden:  # a run on data the route's own model may not see leaves no history (_hidden_follow_up)
+            turns.append(result.new_messages())
+            self._age(chat_id, state, route, turns, tokens)
         state["last"] = (route, text, clock.time(), result.output, "")
         self._save(chat_id, state, route)
         self._learn(chat_id, state, route)
@@ -759,14 +808,15 @@ class Core:
                      steps=_steps(result.new_messages()))
 
     async def delegate(self, route: str, request: str, tainted: bool = False, said: str = "",
-                       context: str = "") -> delegation.StepResult:
+                       context: str = "", local: bool = False) -> delegation.StepResult:
         """One assistant on one complete request from another (delegation.py): no conversation history, its own usage
         limit, and read-only: its writes come back as proposals, except those the user's own message (`said`) asked
         for (_authorizer). `tainted`: the asking run had read untrusted content. `context`: the chat's thread, for a
-        planner's step (an `ask` writes its request complete instead). The caller logs it, under its own turn."""
+        planner's step (an `ask` writes its request complete instead). `local`: on the local model whatever the
+        route's setting. The caller logs it, under its own turn."""
         started = clock.time()
         step = delegation.StepResult(route, request, "")
-        agent, deps, model, where = await self._agent(route, request)
+        agent, deps, model, where = await self._agent(route, request, local=local)
         cloud = where == "cloud"
         view = self._view(route, "", where)  # an agent wrote the request: nothing in it counts as the user's words
         guard = guards.Guard(request, self.life.now(), checks=guards.CHECKS.get(route, ()), tainted=True,

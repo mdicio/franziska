@@ -68,13 +68,15 @@ def instructions(assistants: dict[str, str]) -> str:
 
 def checked(plan: Plan, allowed: set[str]) -> list[Step]:
     """The steps that may run: allowed assistants, at most MAX_STEPS, one per assistant (a repeat is merged into the
-    first's request). Fewer than two left: not a plan, the normal turn answers."""
+    first's request). A repeat that needs earlier results moves the merged step to its own place, after the steps it
+    needs: life, money, life* would otherwise run life* before money found anything. Fewer than two left: not a plan,
+    the normal turn answers."""
     steps: dict[str, Step] = {}
     for s in plan.steps:
         if s.assistant not in allowed or not s.request.strip():
             continue
         if s.assistant in steps:
-            first = steps[s.assistant]
+            first = steps.pop(s.assistant) if s.uses_previous else steps[s.assistant]
             steps[s.assistant] = first.model_copy(update={"request": f"{first.request}\n{s.request}",
                                                          "uses_previous": first.uses_previous or s.uses_previous})
         else:

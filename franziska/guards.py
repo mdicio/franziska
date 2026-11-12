@@ -221,6 +221,9 @@ class Guard(AbstractCapability):
         self.tainted, self.defer = tainted, defer
         self.deferred: list = []  # proposals made of writes this run wasn't allowed to do
         self.sources: list[str] = []  # tool results of the assistants this run asked (delegation.py)
+        # The route's own earlier turns: the user's messages (a document they sent) and the tool results. A figure from
+        # there is backed: 'quanto era l'importo?' after a bill was read was stopped as invented (2026-11-12).
+        self.earlier = ""
         self._weekday_checked = False
         self._repeated: set[tuple[str, str]] = set()  # reads already answered once from an earlier identical call
         self.retries: list[str] = []  # what the model was sent back for, in order (evals record these)
@@ -375,7 +378,7 @@ class Guard(AbstractCapability):
                 "Don't call any tool.")
 
     def evidence(self) -> str:
-        return "\n".join([self.text, f"{self.now:%Y-%m-%d %H:%M}",
+        return "\n".join([self.text, f"{self.now:%Y-%m-%d %H:%M}", self.earlier,
                           *(c.result for c in self.calls if c.ok and c.name not in RELAYED), *self.sources])
 
     # ---- the reply when a guard stopped the run ---------------------------------------------------

@@ -44,7 +44,9 @@ CREATE TABLE IF NOT EXISTS turns (
     tokens  INTEGER,            -- the window as the server counted it after the turn (prompt + answer of the last call)
     parent  INTEGER,            -- the turn whose assistant asked for this one (delegation.py); NULL for the user's own
     said    TEXT,               -- the user's own words when `text` carries more (a document's text after the caption)
-    doc     INTEGER             -- the library document the message brought (library.py), or NULL
+    doc     INTEGER,            -- the library document the message brought (library.py), or NULL
+    seen_as TEXT                -- a run that saw another route's data (Core._hidden_follow_up): that route, whose
+                                -- class the turn then also has (thread, search, digests, learning); NULL: its own
 );
 CREATE INDEX IF NOT EXISTS turns_route_at ON turns(route, at);
 CREATE TABLE IF NOT EXISTS digests (   -- one summary per ISO week and route, made when its turns age out
@@ -121,22 +123,24 @@ class TurnLog:
         if "said" not in columns:  # stores from before the chat thread (2026-11-01)
             self.con.execute("ALTER TABLE turns ADD COLUMN said TEXT")
             self.con.execute("ALTER TABLE turns ADD COLUMN doc INTEGER")
+        if "seen_as" not in columns:  # stores from before 2026-11-12
+            self.con.execute("ALTER TABLE turns ADD COLUMN seen_as TEXT")
         self.embedder = None  # library.Embedder, set by Core: search by meaning too
 
     @db.locked
     def add(self, chat_id: int, route: str, text: str, reply: str, *, p: float | None = None,
             tools: Iterable[dict] = (), stopped: str | None = None, ms: int = 0, tokens: int | None = None,
             at: datetime | None = None, parent: int | None = None, said: str | None = None,
-            doc: int | None = None) -> int | None:
+            doc: int | None = None, seen_as: str | None = None) -> int | None:
         """Record one turn; its id. Never raises: a failing log must not break the reply (None then)."""
         try:
             calls = [{**c, "result": str(c.get("result", ""))[:RESULT_CHARS]} for c in tools]
             cur = self.con.execute(
-                "INSERT INTO turns (at, chat_id, route, p, text, reply, tools, stopped, ms, tokens, parent, said, doc)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO turns (at, chat_id, route, p, text, reply, tools, stopped, ms, tokens, parent, said, doc,"
+                " seen_as) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ((at or self.clock()).isoformat(timespec="minutes"), chat_id, route, p, text, reply,
                  json.dumps(calls, ensure_ascii=False, default=str), stopped, ms, tokens, parent,
-                 said if said is not None and said != text else None, doc))
+                 said if said is not None and said != text else None, doc, seen_as))
             self.con.commit()
             return cur.lastrowid
         except Exception:
@@ -167,8 +171,8 @@ class TurnLog:
         routes = list(routes)
         if not routes:
             return 0, None
-        n, first = self.con.execute(f"SELECT count(*), min(at) FROM turns t WHERE {SEEN} AND route IN ({_marks(routes)})",
-                                    routes).fetchone()
+        n, first = self.con.execute(f"SELECT count(*), min(at) FROM turns t WHERE {SEEN} AND {_among(routes)}",
+                                    routes * 2).fetchone()
         return n, first
 
     @db.locked
@@ -178,8 +182,8 @@ class TurnLog:
             return []
         return [r[0] for r in self.con.execute(
             "SELECT t.id FROM turns_fts f JOIN turns t ON t.id = f.rowid"
-            f" WHERE turns_fts MATCH ? AND {SEEN} AND t.route IN ({_marks(routes)})"
-            " ORDER BY bm25(turns_fts, 2.0, 1.0) LIMIT ?", (match, *routes, CANDIDATES))]
+            f" WHERE turns_fts MATCH ? AND {SEEN} AND {_among(routes)}"
+            " ORDER BY bm25(turns_fts, 2.0, 1.0) LIMIT ?", (match, *routes, *routes, CANDIDATES))]
 
     def _meaning(self, routes: list[str], query: str) -> list[int]:
         if not self.embedder or (model := self.embedder.model()) is None:
@@ -187,7 +191,7 @@ class TurnLog:
         with self.lock:
             rows = self.con.execute(
                 f"SELECT v.turn, v.vec FROM turn_vectors v JOIN turns t ON t.id = v.turn WHERE v.model = ? AND {SEEN}"
-                f" AND t.route IN ({_marks(routes)})", (model, *routes)).fetchall()
+                f" AND {_among(routes)}", (model, *routes, *routes)).fetchall()
         if not rows:
             return []
         q = self.embedder.query(query)
@@ -222,15 +226,17 @@ class TurnLog:
     @db.locked
     def thread(self, chat_id: int, limit: int, since: datetime) -> list[tuple[Turn, tuple[str, ...]]]:
         """One chat's latest turns the user saw since `since` and its last clear, oldest first, each with the routes
-        whose data it holds: its own, or for the planner's turn the routes of its steps."""
+        whose data it holds: its own (and the one it was seen as), or for the planner's turn the routes of its steps."""
         rows = self.con.execute(
-            f"SELECT id, at, route, text, reply, chat_id, said, doc FROM turns t WHERE chat_id = ? AND {SEEN} AND at >= ?"
+            f"SELECT id, at, route, text, reply, chat_id, said, doc, seen_as FROM turns t WHERE chat_id = ? AND {SEEN}"
+            " AND at >= ?"
             " AND id > COALESCE((SELECT value FROM marks WHERE name = ?), 0) ORDER BY id DESC LIMIT ?",
             (chat_id, since.isoformat(timespec="minutes"), f"cleared:{chat_id}", limit)).fetchall()
         out = []
-        for i, at, route, text, reply, chat, said, doc in reversed(rows):
+        for i, at, route, text, reply, chat, said, doc, seen_as in reversed(rows):
             steps = tuple(r for (r,) in self.con.execute("SELECT DISTINCT route FROM turns WHERE parent = ?", (i,)))
-            out.append((Turn(at, route, text, reply, chat, said, doc, i), steps if route == "plan" else (route,)))
+            holds = steps if route == "plan" else (route, seen_as) if seen_as else (route,)
+            out.append((Turn(at, route, text, reply, chat, said, doc, i), holds))
         return out
 
     def fill(self, batch: int = 16, max_s: float = 30.0, quiet: Callable[[], bool] = lambda: True) -> int:
@@ -305,7 +311,8 @@ class TurnLog:
         raw = (self.clock() - timedelta(days=RAW_DAYS)).isoformat(timespec="minutes")
         hard = (self.clock() - timedelta(days=KEEP_DAYS)).isoformat(timespec="minutes")
         gone = 0
-        for turn_id, at, route in self.con.execute("SELECT id, at, route FROM turns WHERE at < ?", (raw,)).fetchall():
+        for turn_id, at, route in self.con.execute("SELECT id, at, COALESCE(seen_as, route) FROM turns WHERE at < ?",
+                                                   (raw,)).fetchall():
             if at < hard or self.con.execute("SELECT 1 FROM digests WHERE week = ? AND route = ?",
                                              (week_of(at), route)).fetchone():
                 gone += self.con.execute("DELETE FROM turns WHERE id = ?", (turn_id,)).rowcount
@@ -334,9 +341,11 @@ class TurnLog:
 
     @db.locked
     def full_after(self, turn_id: int, route: str) -> list[tuple[int, str, str, list[dict]]]:
-        """(id, text, reply, tool calls) of this route's finished turns newer than `turn_id`, oldest first."""
+        """(id, text, reply, tool calls) of this route's finished turns newer than `turn_id`, oldest first; a turn
+        seen as another route's is that route's (what is learned from it stays in that scope)."""
         return [(i, t, r, json.loads(tools or "[]")) for i, t, r, tools in self.con.execute(
-            "SELECT id, text, reply, tools FROM turns WHERE id > ? AND route = ? AND stopped IS NULL ORDER BY id",
+            "SELECT id, text, reply, tools FROM turns WHERE id > ? AND COALESCE(seen_as, route) = ? AND stopped IS NULL"
+            " ORDER BY id",
             (turn_id, route))]
 
     @db.locked
@@ -345,7 +354,8 @@ class TurnLog:
         raw = (self.clock() - timedelta(days=RAW_DAYS)).isoformat(timespec="minutes")
         out: dict[tuple[str, str], list[Turn]] = {}
         for at, route, text, reply in self.con.execute(
-                "SELECT at, route, text, reply FROM turns WHERE at < ? AND stopped IS NULL ORDER BY id", (raw,)):
+                "SELECT at, COALESCE(seen_as, route), text, reply FROM turns WHERE at < ? AND stopped IS NULL"
+                " ORDER BY id", (raw,)):
             key = (week_of(at), route)
             if not self.con.execute("SELECT 1 FROM digests WHERE week = ? AND route = ?", key).fetchone():
                 out.setdefault(key, []).append(Turn(at, route, text, reply))
@@ -366,3 +376,8 @@ def week_of(at: str) -> str:
     """'2026-10-30T14:05' → '2026-W44'."""
     year, week, _ = datetime.fromisoformat(at).isocalendar()
     return f"{year}-W{week:02d}"
+
+
+def _among(routes) -> str:
+    """`turns t` rows of these routes, and seen as one of them when seen as another's (bind `routes` twice)."""
+    return f"t.route IN ({_marks(routes)}) AND COALESCE(t.seen_as, t.route) IN ({_marks(routes)})"
