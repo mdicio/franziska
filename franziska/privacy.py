@@ -14,23 +14,19 @@ FRANZISKA_SEES replaces whole entries: 'chat=public,personal,money;pc=public,per
 
 from collections.abc import Iterable, Mapping
 
-CLASSES = ("public", "personal", "mail", "money")
+from franziska import modules
 
-# The class of what a route handles. A workflow's turns get its scope's class (Core registers them); a route that is
-# not here (the planner's own row, which mixes several) is seen by nobody: its steps are logged under their routes.
-HOLDS: dict[str, str] = {"life": "personal", "chat": "personal", "pc": "personal", "cloud": "personal",
-                         "money": "money", "mail": "mail", "web": "public"}
+CLASSES = modules.CLASSES
 
-ROUTES = tuple(HOLDS)  # the assistants, before any workflow is registered
+# The class of what a route handles (modules.py declares it per assistant; 'cloud' is the desktop-off ChatGPT turn). A
+# workflow's turns get its scope's class (Core registers them); a route that is not here (the planner's own row, which
+# mixes several) is seen by nobody: its steps are logged under their routes.
+HOLDS: dict[str, str] = {**{m.name: m.holds for m in modules.BUILTIN}, "cloud": "personal"}
 
-SEES: dict[str, tuple[str, ...]] = {
-    "life": ("public", "personal", "mail"),
-    "mail": ("public", "personal", "mail"),
-    "money": ("public", "personal", "mail", "money"),  # mail: the bills and receipts indexed from Gmail (2026-11-01)
-    "chat": ("public", "personal"),
-    "pc": ("public", "personal"),
-    "web": ("public",),
-}
+ROUTES = tuple(HOLDS)  # the assistants, before any workflow is registered (outside modules are added: add_module)
+
+# What each route may see (modules.py; money sees mail: the bills and receipts indexed from Gmail, 2026-11-01).
+SEES: dict[str, tuple[str, ...]] = {m.name: m.sees for m in modules.BUILTIN}
 CLOUD_SEES: tuple[str, ...] = ()  # what a cloud model's run may see of the turn log and the thread
 CLAUDE_SEES: tuple[str, ...] = ("public", "personal")  # what a run on Claude may see (never money or mail)
 # The chat's turn just before (within core.FOLLOW_UP_S) is in every local run's thread whatever its class: the user's
@@ -43,6 +39,14 @@ def configure(overrides: Mapping[str, Iterable[str]]) -> None:
     for route, classes in overrides.items():
         classes = tuple(c for c in classes if c in CLASSES)
         SEES[route] = ("public",) if route == "web" else classes
+
+
+def add_module(module: modules.Module) -> None:
+    """An outside module (modules.load): its class and what it sees, unless FRANZISKA_SEES already set them."""
+    global ROUTES
+    HOLDS.setdefault(module.name, module.holds)
+    SEES.setdefault(module.name, ("public",) if module.name == "web" else module.sees)
+    ROUTES = tuple(dict.fromkeys((*ROUTES, module.name)))
 
 
 def register(route: str, like: str) -> None:

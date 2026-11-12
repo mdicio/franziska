@@ -21,12 +21,12 @@ from typing import Literal
 
 from pydantic_ai.toolsets import FunctionToolset
 
-from franziska import workflows
+from franziska import modules, workflows
 
 # Caller → the assistants it may ask. Not life → money yet: the secretary never reads the ledger (DESIGN decision 6)
 # until money has typed answers to give it (check_payment, FRANZISKA.md F1). Nobody asks web: a request an agent
 # writes can carry personal data into a search query. Chat and web hand off instead.
-ASK: dict[str, tuple[str, ...]] = {"life": ("mail",), "money": ("life", "mail")}
+ASK: dict[str, tuple[str, ...]] = {m.name: m.asks for m in modules.BUILTIN if m.asks}  # Module.asks
 MAX_ASKS = 2  # per run
 ANSWER_CHARS = 4000  # of a callee's answer given back to the caller
 

@@ -33,6 +33,7 @@ words` typed in the chat runs it like the Telegram command.
 
 import asyncio
 import contextlib
+import httpx
 import hmac
 import json
 import logging
@@ -51,12 +52,11 @@ from pydantic import BaseModel, ValidationError
 
 from franziska import backup, code, instructions, memory, obs, workflows
 from franziska.config import Settings
-from franziska.core import DOCUMENT_REQUEST, MAIL_ROUTE, Core, Reply
+from franziska.core import DOCUMENT_REQUEST, Core, Reply
 from franziska.finance.service import eur
-from franziska.router import ROUTES
 from franziska.secretary.service import LifeError
 from franziska.secretary.tasks import iso
-from franziska.web import control, tools
+from franziska.web import control, onboarding, tools
 
 log = logging.getLogger(__name__)
 
@@ -360,8 +360,7 @@ class Web:
         """The 3D view's cast, at the level of who does what: Franziska, her assistants and workflows, how busy each
         has been. The page lays out its landscape from this alone, so a new route or workflow shows up by itself."""
         core = self.core
-        said = {**ROUTES, **({"mail": MAIL_ROUTE} if core.mail_agent else {}),
-                 **{w.name: w.description for w in core.workflows.values()}}
+        said = {**core.assistants, **{w.name: w.description for w in core.workflows.values()}}
         turns = core.turns.counts(WORLD_DAYS)
         members = [{"key": key, "label": core.labels.get(key, key), "kind": "workflow" if key in core.workflows
                     else "assistant", "about": about(text), "turns": turns.get(key, 0),
@@ -617,6 +616,27 @@ def create_app(settings: Settings, core: Core | None = None) -> FastAPI:
         except (ValueError, OSError) as e:
             raise HTTPException(400, str(e))
         return saved
+
+    @app.get("/api/setup")
+    async def setup_page():
+        """The Setup page (onboarding.py): each piece, whether it works, what it adds, how to turn it on."""
+        return await onboarding.overview()
+
+    @app.put("/api/setup")
+    async def setup_save(body: dict):
+        try:
+            return await asyncio.to_thread(onboarding.save, body.get("env") or {})
+        except (ValueError, OSError) as e:
+            raise HTTPException(400, str(e))
+
+    @app.post("/api/setup/{action}")
+    async def setup_action(action: str):
+        if action not in onboarding.ACTIONS:
+            raise HTTPException(404, f"unknown action {action}")
+        try:
+            return await onboarding.ACTIONS[action]()
+        except (ValueError, OSError, httpx.HTTPError) as e:
+            raise HTTPException(400, str(e) if not isinstance(e, httpx.HTTPError) else "Telegram can't be reached")
 
     @app.post("/api/services/{sid}/restart")
     async def service_restart(sid: str):

@@ -1,4 +1,5 @@
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -109,6 +110,8 @@ class Settings:
     # The pc route (franziska/pc.py): questions about this computer and a few actions on it, each a button. The
     # folders its file tools may see (default: the XDG user folders that exist); empty pc=0 turns the route off.
     pc: bool = True
+    # Assistants from outside this repo (franziska/modules.py): comma-separated import paths, each with a MODULE.
+    modules: str = ""
     pc_folders: tuple[Path, ...] = ()
     # Traces (franziska/obs.py) also go to this OTLP/HTTP endpoint, e.g. a local Phoenix: http://localhost:6006/v1/traces
     otlp: str = ""
@@ -194,9 +197,11 @@ class Settings:
         return self.base_url.removesuffix("/").removesuffix("/v1") if self.base_url else self.ollama_url
 
     @classmethod
-    def from_env(cls) -> "Settings":
-        ids = os.environ.get("FRANZISKA_ALLOWED_IDS", "")
-        env = os.environ.get
+    def from_env(cls, environ: Mapping[str, str] | None = None) -> "Settings":
+        """From the process environment, or from `environ` (the web UI's Setup page reads the saved .env this way)."""
+        source = os.environ if environ is None else environ
+        ids = source.get("FRANZISKA_ALLOWED_IDS", "")
+        env = source.get
         return cls(
             model=env("FRANZISKA_MODEL", cls.model),
             ollama_base_url=env("FRANZISKA_OLLAMA_BASE_URL", cls.ollama_base_url),
@@ -261,6 +266,7 @@ class Settings:
             code_steps=int(env("FRANZISKA_CODE_STEPS", cls.code_steps)),
             code_thinking=env("FRANZISKA_CODE_THINKING", "1") != "0",
             pc=env("FRANZISKA_PC", "1") != "0",
+            modules=env("FRANZISKA_MODULES", ""),
             pc_folders=tuple(Path(f.strip()).expanduser() for f in env("FRANZISKA_PC_FOLDERS", "").split(",")
                              if f.strip()),
         )

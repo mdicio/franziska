@@ -58,14 +58,14 @@ import httpx
 import numpy as np
 from pydantic_ai import FunctionToolset, ModelRetry
 
-from franziska import db, fts
+from franziska import db, fts, modules
 from franziska.privacy import CLASSES, sees
 
 log = logging.getLogger(__name__)
 
 # The routes with document tools. What each may search and read, and the class a document gets from the route it came
 # in on, is privacy.py's one table (SEES, HOLDS).
-ROUTES = ("life", "mail", "money", "web")
+ROUTES = modules.names("documents")  # modules.py: Module.documents
 
 CHUNK_CHARS = 1300  # ~400 tokens at budget.CHARS_PER_TOKEN
 OVERLAP = 200  # ~15% of a chunk, repeated at the start of the next

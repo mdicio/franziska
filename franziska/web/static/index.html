@@ -25,6 +25,7 @@
     <a href="#code" data-view="code"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg><span>Code</span></a>
     <a href="#data" data-view="data"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/></svg><span>Data</span></a>
     <a href="#memory" data-view="memory"><svg viewBox="0 0 24 24"><path d="M7 4h10v16l-5-4-5 4z"/></svg><span>Memory</span></a>
+    <a href="#setup" data-view="setup" id="nav-setup"><svg viewBox="0 0 24 24"><path d="M5 12.5l4 4L19 7"/><rect x="3" y="3" width="18" height="18" rx="4"/></svg><span>Setup</span></a>
     <a href="#settings" data-view="settings"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span>Settings</span></a>
     <a href="/world" title="The team as a 3D world"><svg viewBox="0 0 24 24"><path d="M3 18l6-9 4 6 3-4 5 7z"/><circle cx="17" cy="6" r="2"/></svg><span>World</span></a>
     <div class="nav-tools">
@@ -96,6 +97,10 @@
     <section class="view" id="view-memory" aria-label="Memory">
       <header class="bar"><h1>Memory</h1><input id="memq" type="search" placeholder="Filter…"></header>
       <div class="page" id="memory"></div>
+    </section>
+    <section class="view" id="view-setup" aria-label="Setup">
+      <header class="bar"><h1>Setup</h1><small class="bar-note">Franziska works with the language model alone. Everything else is optional: each step says what it adds.</small></header>
+      <div class="page" id="setup"></div>
     </section>
     <section class="view" id="view-settings" aria-label="Settings">
       <header class="bar"><h1>Settings</h1><small class="bar-note">What is running, and the choices behind it. Changes are saved at once and applied when you restart a service.</small></header>

@@ -485,3 +485,25 @@ pre.out { margin: 0; padding: 10px 12px; background: var(--sunk); border-radius:
 .diff .d-hunk { color: var(--accent); }
 .diff .d-head, .diff .d-file { color: var(--muted); font-weight: 600; }
 @media (max-width: 720px) { .job-row .when, .job-row .repo { display: none; } }
+
+/* ---- setup: one card per step, open when it needs you ---- */
+.works { padding: 14px 18px; margin-top: 8px; }
+.works .label { font-weight: 600; }
+.works ul { margin: 6px 0 0; padding-left: 20px; }
+.step { margin: 8px 0; padding: 0; }
+.step > summary { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; list-style: none; }
+.step > summary::-webkit-details-marker { display: none; }
+.step > summary::after { content: "›"; margin-left: auto; color: var(--muted); transition: transform .15s; }
+.step[open] > summary::after { transform: rotate(90deg); }
+.step-title { font-weight: 600; }
+.step-body { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.step-adds { margin: 0; color: var(--muted); }
+.step-how { margin: 0; padding-left: 20px; font-size: 13.5px; }
+.step-how li + li { margin-top: 4px; }
+.step-cmds { display: flex; flex-direction: column; gap: 6px; }
+.cmd { display: flex; align-items: center; gap: 8px; background: var(--sunk); border-radius: 10px; padding: 6px 6px 6px 12px; }
+.cmd code { flex: 1; font: 12.5px ui-monospace, Menlo, monospace; overflow-x: auto; white-space: nowrap; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--sunk); color: var(--muted); }
+.pill.done { background: var(--accent-soft); color: var(--ok); }
+.pill.todo, .pill.problem { background: var(--warn-soft); color: var(--warn); }
+.step-out:empty { display: none; }

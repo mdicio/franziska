@@ -14,24 +14,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from franziska import obs
+from franziska import modules, obs
 
 log = logging.getLogger(__name__)
 
 # Short descriptions after the key measurably beat bare labels (bare: 'memory' vs 'schedule' was confused).
-ROUTES = {
-    "life": "life: appointments, tasks and reminders (also 'done' or 'paid' for one of them), what is planned or "
-            "what the user has to do, or saving, looking up or forgetting personal notes and facts, and what the "
-            "assistant remembers about someone, and what the user's saved documents say (a contract, a policy, a "
-            "manual, a letter)",
-    "money": "money: the user's own money: their expenses, income, bills with an amount to pay, balances, savings, "
-             "the bank statement and its payees (who a payee is, its spending group), their investments and DEGIRO "
-             "portfolio",
-    "web": "web: look something up on the internet: news and current events in the world, things that change and must "
-           "be checked online now (opening hours, prices, results), or anything the user asks to search for on the web",
-    "chat": "chat: anything else: general knowledge and explanations (how ETFs, funds or mortgages work in general), "
-            "small talk",
-}
+# The assistants every installation has; the optional ones (mail, pc, outside modules) and workflows come from Core.
+ROUTES = {m.name: m.description for m in modules.BUILTIN if m.name in modules.CORE}
 QUESTION = "Which assistant should handle this message?"
 # A new task's priority when the user doesn't say it (tasks nag by it: high every 2 h, normal daily, low every 2 days).
 PRIORITIES = {

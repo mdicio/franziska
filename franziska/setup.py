@@ -109,6 +109,24 @@ def _yn(prompt: str, default: bool, yes: bool = False) -> bool:
     return default if not got else got.startswith("y")
 
 
+def write_config(values: dict[str, str]) -> list[str]:
+    """~/.config/franziska/.env from .env.example with `values`, mode 600, linked from the repo's .env; the git hook
+    on. What it did, one line each. init and the web UI's Setup page both start a configuration here."""
+    done = []
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    ENV.write_text(fill((ROOT / ".env.example").read_text(), values))
+    ENV.chmod(0o600)
+    done.append(f"\nWrote {ENV}")
+    link = ROOT / ".env"
+    if not link.exists() and not link.is_symlink():
+        link.symlink_to(ENV)
+        done.append(f"Linked {link} → {ENV}")
+    if (ROOT / ".git").exists():
+        subprocess.run(["git", "-C", str(ROOT), "config", "core.hooksPath", ".githooks"], check=False)
+        done.append("Enabled the git hooks (.githooks): no secrets or data of yours in a commit.")
+    return done
+
+
 def init(force: bool = False, yes: bool = False) -> int:
     if ENV.exists() and not force:
         print(f"{ENV} exists already: edit it, or rerun with --force to start over. `python -m franziska doctor` "
@@ -137,17 +155,8 @@ def init(force: bool = False, yes: bool = False) -> int:
         values["FRANZISKA_PC"] = "0"
     if not _yn("Voice notes (transcribed on this machine's CPU)?", True, yes):
         values["FRANZISKA_VOICE_MODEL"] = ""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    ENV.write_text(fill((ROOT / ".env.example").read_text(), values))
-    ENV.chmod(0o600)
-    print(f"\nWrote {ENV}")
-    link = ROOT / ".env"
-    if not link.exists() and not link.is_symlink():
-        link.symlink_to(ENV)
-        print(f"Linked {link} → {ENV}")
-    if (ROOT / ".git").exists():
-        subprocess.run(["git", "-C", str(ROOT), "config", "core.hooksPath", ".githooks"], check=False)
-        print("Enabled the pre-commit hook (.githooks): no secrets or data of yours in a commit.")
+    for line in write_config(values):
+        print(line)
     print("\nNext:\n"
           f"  1. {t.note}\n"
           "  2. uv run python -m franziska.sandbox bootstrap        # the isolated runtime for run_python\n"

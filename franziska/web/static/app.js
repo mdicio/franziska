@@ -88,7 +88,7 @@ function toast(text, action) {
 }
 
 // ---- views -----------------------------------------------------------------------------------
-const views = { chat: showChat, today: showToday, money: showMoney, flows: showFlows, code: showCode, data: showData, memory: showMemory, settings: showSettings };
+const views = { chat: showChat, today: showToday, money: showMoney, flows: showFlows, code: showCode, data: showData, memory: showMemory, setup: showSetup, settings: showSettings };
 const showing = (name) => $(`#view-${name}`).classList.contains("on");
 function go() {  // '#data/ledger/movements': the view, then what it opens
   const [hash, ...rest] = location.hash.slice(1).split("/").map(decodeURIComponent);
@@ -698,6 +698,117 @@ function dataHome() {
   teleTile(tele);
 }
 
+// ---- setup: each piece, whether it works, what it adds, how to turn it on (web/onboarding.py) ----------------
+const STEP_SAY = { done: "Done", todo: "Needed", off: "Optional", problem: "Not working" };
+let setupOpen = new Set();  // the optional steps the user opened, kept across refreshes
+
+// No configuration yet, or the language model isn't answering: open on Setup instead of an empty chat.
+async function firstRun() {
+  try {
+    const d = await api("/api/setup");
+    $("#nav-setup").classList.toggle("unread", !d.ready);
+    if (!d.ready && !location.hash) location.hash = "#setup";
+  } catch {}
+}
+
+async function showSetup() {
+  const page = $("#setup");
+  let d;
+  try { d = await api("/api/setup"); } catch (e) { page.replaceChildren(h("div", { class: "note" }, e.message)); return; }
+  $("#nav-setup").classList.toggle("unread", !d.ready);
+  renderSetup(page, d);
+}
+
+function setupInput(f, note) {
+  if (f.kind === "bool") return h("input", { type: "checkbox", "aria-label": f.label, checked: f.value === "1", onchange: (e) => note(e.target.checked ? "1" : "0") });
+  if (f.kind === "select") return h("select", { "aria-label": f.label, onchange: (e) => note(e.target.value) },
+    f.choices.map((c) => h("option", { value: c, selected: c === f.value }, c || "(off)")));
+  const attrs = { type: f.kind === "secret" ? "password" : f.kind === "number" ? "number" : "text", spellcheck: "false", autocomplete: "off", "aria-label": f.label,
+    value: f.kind === "secret" ? "" : f.value ?? "", oninput: (e) => note(e.target.value),
+    placeholder: f.kind === "secret" ? (f.set ? "Saved · type to replace" : "123456789:AA…") : f.kind === "time" ? "HH:MM" : f.default || "" };
+  if (f.kind === "tz") {
+    const input = h("input", { ...attrs, list: "dl-tz" });
+    const zones = Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : [];
+    return h("div", {}, input, h("datalist", { id: "dl-tz" }, zones.map((z) => h("option", { value: z }))));
+  }
+  return h("input", attrs);
+}
+
+function renderSetup(page, d) {
+  const restartRow = (ids) => h("div", { class: "tile-actions" }, h("small", { class: "sub" }, "Saved. Apply it:"),
+    ids.map((sid) => h("button", { class: "ghost", type: "button", onclick: async (e) => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = "Restarting…";
+      try { await api(`/api/services/${sid}/restart`, { method: "POST" }); } catch (err) { toast(err.message); b.disabled = false; return; }
+      if (sid === "web") return waitForWeb();
+      setTimeout(showSetup, 3000);
+    } }, `Restart the ${sid === "bot" ? "bot" : "web app"}`)));
+
+  const card = (st) => {
+    const dirty = {};
+    const out = h("div", { class: "step-out" });
+    const save = h("button", { class: "run", type: "button", disabled: true, onclick: async () => {
+      save.disabled = true;
+      try {
+        const r = await api("/api/setup", { method: "PUT", body: { env: dirty } });
+        if (r.started?.length) toast("Your configuration is started: " + d.config);
+        else toast(r.changed.length ? "Saved." : "Nothing changed.");
+        await showSetup();
+        const again = page.querySelector(`[data-step="${st.id}"] .step-out`);
+        if (again && r.changed.length && st.restart.length && d.configured) again.replaceChildren(restartRow(st.restart));
+      } catch (e) { toast(e.message); save.disabled = false; }
+    } }, d.configured ? "Save" : "Save and start");
+    const fields = st.fields.map((f) => {
+      const input = setupInput(f, (v) => { dirty[f.key] = v; save.disabled = false; });
+      return h("div", { class: "field" + (f.kind === "bool" ? " inline" : "") }, h("label", {}, f.label), input, f.help ? h("small", {}, f.help) : "");
+    });
+    const act = (a) => h("button", { class: "ghost", type: "button", onclick: async (e) => {
+      const b = e.currentTarget, label = b.textContent; b.disabled = true; b.textContent = "Working…";
+      try {
+        const r = await api(`/api/setup/${a.id}`, { method: "POST" });
+        if (r.people) {
+          out.replaceChildren(h("div", { class: "sub" }, "Who is you?"), h("div", { class: "tile-actions" }, r.people.map((p) =>
+            h("button", { class: "ghost", type: "button", onclick: async () => {
+              const ids = new Set((st.fields.find((f) => f.key === "FRANZISKA_ALLOWED_IDS")?.value || "").split(",").filter(Boolean));
+              ids.add(String(p.id));
+              try { await api("/api/setup", { method: "PUT", body: { env: { FRANZISKA_ALLOWED_IDS: [...ids].join(",") } } }); toast(`Allowed ${p.name}.`); }
+              catch (err) { toast(err.message); return; }
+              await showSetup();
+            } }, `${p.name} · ${p.id}`))));
+        } else {
+          out.replaceChildren(h("div", { class: "sub" }, r.say || "Done.", r.link ? [" ", h("a", { href: r.link, target: "_blank", rel: "noopener" }, "Open the chat ↗")] : ""));
+          if (a.id !== "telegram_check") await showSetup();
+        }
+      } catch (err) { out.replaceChildren(h("div", { class: "note" }, err.message)); }
+      b.disabled = false; b.textContent = label;
+    } }, a.label);
+    const copy = (c) => h("div", { class: "cmd" }, h("code", {}, c), h("button", { class: "ghost", type: "button", onclick: async () => {
+      try { await navigator.clipboard.writeText(c); toast("Copied."); } catch { toast("The browser didn't allow copying here."); }
+    } }, "Copy"));
+    const open = st.required || st.state === "todo" || st.state === "problem" || setupOpen.has(st.id);
+    const body = [
+      h("p", { class: "step-adds" }, st.adds),
+      st.detail ? h("div", { class: st.state === "problem" || st.state === "todo" ? "note" : "sub" }, st.detail) : "",
+      st.how.length ? h("ol", { class: "step-how" }, st.how.map((x) => h("li", {}, x))) : "",
+      st.commands.length ? h("div", { class: "step-cmds" }, h("small", { class: "sub" }, "In a terminal:"), st.commands.map(copy)) : "",
+      fields.length ? h("div", { class: "wf-form" }, fields, h("div", { class: "field inline" }, save)) : "",
+      st.actions.length ? h("div", { class: "tile-actions" }, st.actions.map(act)) : "",
+      out];
+    return h("details", { class: `card step s-${st.state}`, "data-step": st.id, open: open || null,
+      ontoggle: (e) => { e.currentTarget.open ? setupOpen.add(st.id) : setupOpen.delete(st.id); } },
+      h("summary", {}, h("span", { class: `pill ${st.state}` }, STEP_SAY[st.state] || st.state), h("span", { class: "step-title" }, st.title)),
+      h("div", { class: "step-body" }, body));
+  };
+
+  const required = d.steps.filter((s) => s.required), optional = d.steps.filter((s) => !s.required);
+  page.replaceChildren(
+    h("div", { class: "card works" }, h("div", { class: "label" }, d.ready ? "Works now" : "Not working yet"),
+      d.works.length ? h("ul", {}, d.works.map((w) => h("li", {}, w))) : h("div", { class: "sub" }, "The two steps below come first: the language model and a few things about you.")),
+    h("div", { class: "section" }, h("h2", {}, "First"), h("small", {}, "needed")),
+    ...required.map(card),
+    h("div", { class: "section" }, h("h2", {}, "When you want them"), h("small", {}, "optional, in any order")),
+    ...optional.map(card));
+}
+
 // ---- settings: what runs, the choices behind it, and the service buttons ------------------------------------
 const STATE_SAY = { active: "Running", inactive: "Stopped", activating: "Starting…", deactivating: "Stopping…", failed: "Failed", missing: "Not installed" };
 let settingsPoll;
@@ -1156,6 +1267,6 @@ addEventListener("keydown", (e) => {
 window.addEventListener("hashchange", () => { closePalette(); go(); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { refreshStatus(); if (!busy) go(); } });
 setInterval(() => { refreshStatus(); refreshTelemetry(); }, 30000);
-refreshStatus().then(go);
+refreshStatus().then(firstRun).then(go);
 refreshTelemetry();
 if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});

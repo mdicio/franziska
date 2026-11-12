@@ -23,13 +23,15 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from franziska import modules
+
 MAX_STEPS = 4
 # What the planner may name. Chat isn't one: general knowledge is something any assistant can add to its answer.
-ASSISTANTS = ("life", "money", "web", "mail", "pc")
+ASSISTANTS = modules.names("plannable")  # Module.plannable (modules.py), fixed at import: Step lists them
 
 
 class Step(BaseModel):
-    assistant: Literal["life", "money", "web", "mail", "pc"]
+    assistant: Literal[ASSISTANTS]  # type: ignore[valid-type]
     request: str = Field(description="The complete request for this assistant, in the user's language and with "
                                      "their own words for dates, times, amounts, names and conditions")
     uses_previous: bool = Field(False, description="true when this step needs what the earlier steps found (an "

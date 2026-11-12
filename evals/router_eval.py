@@ -60,6 +60,11 @@ CASES: list[tuple[str, str, tuple[str, str] | None]] = [
     ("quali bollette devo ancora pagare?", "money", None),
     ("how much did I save last month?", "money", None),
     ("metti un budget di 200 euro per i ristoranti", "money", None),
+    # Investments: money, whatever the broker is called (the route's description names none, 2026-11-12).
+    ("come sta andando il mio portafoglio?", "money", None),
+    ("quanto valgono oggi i miei ETF?", "money", None),
+    ("how much are my investments up this year?", "money", None),
+    ("quante azioni ho su Fineco?", "money", None),
     ("e ad agosto?", "money", ("money", "quanto ho speso al supermercato a luglio?")),
     ("e giovedì?", "life", ("life", "cosa ho mercoledì?")),
     ("anzi, dopodomani", "life", ("life", "ricordami di chiamare la banca domani")),

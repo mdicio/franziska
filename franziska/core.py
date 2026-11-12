@@ -31,7 +31,7 @@ from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, Thinking
 from franziska import consolidate, housekeeping, summary
 from franziska.budget import Budget
 from franziska.doccache import DocCache
-from franziska import cloud, code, delegation, documents, gpu, guards, health, instructions, library, memory, obs, pc, plan, sandbox, search, workflows
+from franziska import cloud, code, delegation, documents, gpu, guards, health, instructions, library, memory, modules, obs, pc, plan, sandbox, search, workflows
 from franziska import privacy as privacy_rules
 from franziska.conversations import Conversations
 from franziska.events import Events
@@ -47,7 +47,7 @@ from franziska.mail import agent as mail_agent
 from franziska.mail import client as mailbox
 from franziska.market.brief import Market
 from franziska.market.sources import Http
-from franziska.router import ROUTES, Router
+from franziska.router import Router
 from franziska.secretary import agent as secretary
 from franziska.secretary.service import Life
 from franziska.turns import HANDED_OFF, TurnLog
@@ -66,19 +66,13 @@ FOLD_IDLE_S = 60.0  # a fold waits for this much quiet in the chat, so the next 
 FOLD_WAITING = 8  # ...unless this many aged turns wait for it: then they go in one fold (summary.py) without quiet
 LEARN_MIN = 2  # a route's new turns are read for facts once this many have come and the chat pauses
 SEEN = "seen"  # state key: time.monotonic() of the chat's latest message
-LABELS = {"life": "📅 Life", "money": "💶 Money", "chat": "💬 Chat", "web": "🌐 Web", "mail": "✉️ Google", "pc": "🖥 PC",
-          "plan": "🧩 Plan"}
-# The mail route (FRANZISKA_GOG_ACCOUNT, local model): open-ended email work, as opposed to the mail_bills workflow.
-MAIL_ROUTE = ("mail: anything else about the user's email or Google files: find, read or summarise messages and "
-              "threads, draft a reply, label, archive or clean up the inbox; find files in Google Drive, read or "
-              "add to a Google Doc, read or update a Google Sheet")
-# The pc route (pc.py, FRANZISKA_PC): this computer, its files and coding jobs. Local model only (not in llm.CLOUD_OK).
-PC_ROUTE = ("pc: this computer itself: free disk space, memory, the GPU, running programs, Franziska's own services "
-            "and their logs; finding, listing, sending, moving or deleting files in the user's folders (Downloads, "
-            "Documents, Pictures); writing a script or program, or changing code in a repository")
+# The assistants' labels and descriptions are modules.py's; the planner's turn is not an assistant.
+LABELS = {**{m.name: m.label for m in modules.BUILTIN}, "plan": "🧩 Plan"}
+MAIL_ROUTE = modules.REGISTRY["mail"].description  # FRANZISKA_GOG_ACCOUNT, local model
+PC_ROUTE = modules.REGISTRY["pc"].description  # FRANZISKA_PC, local model or Claude, never the cloud
 
 # The components a route's answer relies on: while one is failing (health.py), the reply says so.
-RELIES = {"life": ("calendar",), "mail": ("calendar",)}
+RELIES = {m.name: m.relies for m in modules.BUILTIN if m.relies}  # Module.relies
 CONTEXT_DROPPED = ("🧹 Our earlier messages here no longer fit in what I can read at once, so I answered this one "
                    "without them.\n\n")
 
@@ -112,9 +106,9 @@ STATEMENT_Q = ("Is this file a bank, card or payment account's statement: the ac
                "with a date and an amount?")
 STATEMENT_P = 0.7
 
-CODE_ROUTES = ("money", "chat")  # the routes with run_python (sandbox.py, DESIGN decision 44), local model only
+CODE_ROUTES = modules.names("code")  # the routes with run_python (sandbox.py, DESIGN decision 44), local model only
 DOCUMENT_CHARS = 6000  # of a file's text sent to the agent; the rest is in the library (search_documents)
-DOCUMENT_ROUTES = ("life", "money", "chat")
+DOCUMENT_ROUTES = modules.names("receives")  # where a document the user sends is answered
 DOCUMENT_REQUEST = ("I received this document. Say in two lines what it is, then what I need to do about it: a "
                     "payment (amount, due date), an appointment or a deadline. Don't add anything to my calendar, "
                     "tasks or bills yet; ask me first.")
@@ -231,6 +225,9 @@ class Core:
     def __init__(self, settings: Settings):
         self.settings = settings
         instructions.DIR = settings.data_dir / "instructions"  # the user's edits of the agents' rules (web UI)
+        for m in modules.load(settings.modules):  # FRANZISKA_MODULES: assistants from outside this repo
+            privacy_rules.add_module(m)
+            log.info("module %s loaded (%s data)", m.name, m.holds)
         self.models = Models(settings)  # per route: local, or the cloud model on FRANZISKA_CLOUD_ROUTES
         self.life = Life.from_settings(settings)
         self.money = Money.open(settings.ledger_db, settings.timezone, life=self.life, owner=settings.owner_name)
@@ -284,19 +281,20 @@ class Core:
         routes = {w.name: w.description for w in self.workflows.values()}
         self.code = code.Jobs(settings, self.life.now)  # coding jobs (code.py): started by you, run in their own unit
         self.pc_folders = pc.default_folders(settings) if settings.pc else ()
-        if settings.pc:
-            routes["pc"] = PC_ROUTE
+        # The assistants this installation has switched on (modules.py): the router gets the optional ones on top of
+        # its own (router.ROUTES); hand_off and ask can name any of them (delegation.py).
+        on = [m for m in modules.installed(settings)]
+        routes.update({m.name: m.description for m in on if m.name not in modules.CORE})
+        self.labels.update({m.name: m.label for m in on})
         self.mail_agent = self.mail_model = None
         if settings.gog_account:
-            routes["mail"] = MAIL_ROUTE
             self.mail_agent, self.mail_model = mail_agent.build(settings, self.life.now, self.budget.gmail_bytes), mail_agent.build_mail_model(settings)
         self.attachments = (mail_agent.attachments_toolset(self.gmail, self.budget.attachment_chars, self.doc_cache,
                                                            self.library) if self.mail_agent and self.gmail else None)
         self.bill_tools = finance.bill_toolset(self.money)  # life's add_bill: a payment is a task and a bill
         self.market_tools = finance.market_toolset(self.money, settings.market_db)  # money's reports read back
         # The assistants by route, as the router describes them: whom hand_off and ask can name (delegation.py).
-        self.assistants = {**ROUTES, **({"mail": MAIL_ROUTE} if self.mail_agent else {}),
-                           **({"pc": PC_ROUTE} if settings.pc else {})}
+        self.assistants = {m.name: m.description for m in on}
         self.router = Router.from_settings(settings, routes) if settings.router else None
         self.ctx.router = self.router
         if self.router:
@@ -494,13 +492,13 @@ class Core:
         with a document in the message, only the routes that may read one."""
         if self.mode(state) != "auto" or route not in self.assistants:
             return {}
-        allowed = DOCUMENT_ROUTES if said is not None or tainted else self.assistants
+        allowed = modules.names("receives") if said is not None or tainted else self.assistants
         return {k: v for k, v in self.assistants.items() if k in allowed and k != route}
 
     def _callees(self, route: str, where: str = "local") -> dict[str, str]:
-        """Whom `route`'s assistant may ask (delegation.ASK); a run on Claude only those whose answers it may see."""
+        """Whom `route`'s assistant may ask (Module.asks); a run on Claude only those whose answers it may see."""
         classes = privacy_rules.where_sees(route, where) if where == "claude" else None
-        return {k: self.assistants[k] for k in delegation.ASK.get(route, ()) if k in self.assistants
+        return {k: self.assistants[k] for k in (modules.REGISTRY[route].asks if route in modules.REGISTRY else ()) if k in self.assistants
                 and (classes is None or privacy_rules.HOLDS.get(k) in classes)}
 
     async def _agent(self, route: str, text: str, said: str | None = None, previous: str | None = None):
@@ -509,6 +507,9 @@ class Core:
         `said`: the user's own words in `text`; `previous`: their last mail message, for a follow-up's tool groups."""
         model = self.models.for_route(route)
         where = self.models.where(model)
+        if (outside := modules.REGISTRY.get(route)) and outside.build:  # FRANZISKA_MODULES
+            agent, deps = outside.build(self, text, said)
+            return agent, deps, model, where
         if route == "money":
             return finance.agent, self.money, model, where
         if route == "life":
@@ -544,12 +545,12 @@ class Core:
             toolsets.append(self.bill_tools)
         if route == "money":
             toolsets.append(self.market_tools)
-        if route in library.ROUTES:  # the documents this route may see (privacy.SEES); web: public ones only
+        if modules.has(route, "documents"):  # the documents this route may see (privacy.SEES); web: public ones only
             toolsets.append(library.toolset(self.library, route, self.budget.attachment_chars,
                                             None if where == "local" else privacy_rules.where_sees(route, where)))
-        if enable_code and route in CODE_ROUTES and artifacts is not None and self.code_ready:
+        if enable_code and modules.has(route, "code") and artifacts is not None and self.code_ready:
             # Money may copy its own documents into the sandbox; chat (no library) only text it passes itself.
-            privacy = privacy_rules.where_sees(route, where) if route in library.ROUTES else None
+            privacy = privacy_rules.where_sees(route, where) if modules.has(route, "documents") else None
             opener = (lambda doc: self.library.original(doc, privacy)) if privacy else None
             toolsets.append(sandbox.toolset(self.sandbox, self.settings.sandbox_results_dir, artifacts, opener))
         return toolsets
@@ -616,7 +617,7 @@ class Core:
         if not lines:
             return ""
         own = "; your own turns are in your history, not here" if history else ""
-        tools = "" if route in library.ROUTES else (" You have no document tools: for a document's contents the "
+        tools = "" if modules.has(route, "documents") else (" You have no document tools: for a document's contents the "
                                                     "user needs the life or money assistant.")
         return (f"Earlier in this chat (oldest first{own}):\n" + "\n".join(lines)
                 + "\nThe user's new message may refer to these. Another assistant's work may have been too narrow: "
@@ -691,7 +692,7 @@ class Core:
                                            else "\n\n".join(filter(None, [memory.instructions(view), earlier])) or None),
                              toolsets=toolsets or None, capabilities=[guard, self.budget.capability()])
         # On auto, every message (and document) asks the router, so its state is current; pinned, it isn't used.
-        relies = (("router",) if self.mode(state) == "auto" else ()) + RELIES.get(route, ())
+        relies = (("router",) if self.mode(state) == "auto" else ()) + modules.REGISTRY[route].relies if route in modules.REGISTRY else ()
         warn = health.footer(self.health.problems(relies))
         history = summary.as_history(state.get(("summary", route), "")) + [m for turn in turns for m in turn]
         dropped = False
@@ -1091,13 +1092,13 @@ class Core:
         than DOCUMENT_CHARS says how to read the rest."""
         head = f"{caption or DOCUMENT_REQUEST}\n\n[{name}]\n{text[:DOCUMENT_CHARS]}"
         route = state.get("mode", "auto")
-        if route not in DOCUMENT_ROUTES:
+        if route not in (receives := modules.names("receives")):
             found = self.router and await asyncio.to_thread(self.router.route, head)
             if self.router and not found:  # 'life' then, and the reply carries the ⚠️ (turn's footer)
                 self.health.failed("router", self.router.error or "unavailable")
             elif found:
                 self.health.ok("router")
-            route = max(DOCUMENT_ROUTES, key=lambda k: found.probs.get(k, 0)) if found else "life"
+            route = max(receives, key=lambda k: found.probs.get(k, 0)) if found else "life"
         doc = await asyncio.to_thread(self.library.add, name, text, "telegram", privacy_rules.HOLDS[route], mime, data)
         if doc is None:
             return head, route

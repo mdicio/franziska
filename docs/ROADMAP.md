@@ -28,12 +28,36 @@ What real use shows is failing: references across turns and routes (an earlier c
 ## Open source
 
 Prepared for a public release in 2026-11: any bank's export imports through a saved column mapping, and
-`python -m franziska init`, `doctor` and `demo` set it up, check it and show it on invented data. Next:
-1. **Modules**: a module declares its privacy class, routes and jobs, and Core builds the routes from the installed
-   modules instead of fixed wiring, so a new area plugs in without touching Core.
-2. **Bank-neutral routing**: the money route's description still names one broker; make it generic and re-run the
-   routing eval.
-3. A short screen recording of the Telegram chat in the README.
+`python -m franziska init`, `doctor` and `demo` set it up, check it and show it on invented data.
+
+Done 2026-11-12:
+- **Modules, first cut**: every assistant is one `Module` in `franziska/modules.py` (router description, label, privacy
+  class, documents, sandbox, cloud/Claude, asks, the setting that switches it on); the tables the rest reads are built
+  from it. An assistant from outside the repo loads with `FRANZISKA_MODULES` (CONTRIBUTING.md). A module holding money
+  or mail is refused a cloud model or Claude at start.
+- **Bank-neutral routing**: money's description names no broker. Router eval on gemma-4-26B: 57/58 before and after,
+  four new investment cases right at p=1.00, the one miss unchanged.
+- A pre-push hook refuses the pre-public history anywhere but the private archive.
+
+- **Guided setup in the web app** (phase 1, 2026-11-12): a first run opens on Setup (`web/onboarding.py`): the model
+  and a time zone are needed, every other piece is an optional card that says what it adds, whether it works and how
+  to turn it on. Telegram is checked and your id found from the page; the code sandbox and the services (for this
+  folder, not `~/franziska`) install from it. Secrets are write-only. Tested as a stranger: a copy of the repo under
+  an empty home, no .env.
+
+Next, in order (what stops a stranger from using it, biggest first):
+1. **One Google sign-in, from the Setup page.** Google stays optional: without it Franziska keeps its own calendar and
+   the mail assistant is off; there is no replacement for Gmail. Gmail can't be reached without a Google Cloud app of
+   the user's own (gog too: it has no app of its own, and a shared app would need Google's verification and, for
+   Gmail, a yearly security audit). So the page makes that one-time part short: upload the downloaded JSON, one
+   consent in the browser, and the token serves both Franziska and gog (`gog auth credentials set`, `gog auth import`).
+   Today it is two terminal sign-ins.
+2. **Reminders without Telegram**: the scheduler lives in the bot, which needs a token; a web-only install has no
+   reminders. Run the jobs without Telegram and push to the installed web app (or ntfy).
+3. **Modules, second cut**: an outside module's planner steps and background jobs; `/<module>` to pin a route.
+4. **Hardware**: say plainly what works without a 12 GB GPU (Ollama and a small model, the cloud model per route) and
+   measure the router there.
+5. A short screen recording of the Telegram chat in the README.
 
 ## Later
 

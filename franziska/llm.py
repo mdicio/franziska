@@ -24,7 +24,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.usage import UsageLimits
 
-from franziska import gpu
+from franziska import gpu, modules
 from franziska.config import Settings
 from franziska.usage import Metered, UsageLog
 
@@ -38,13 +38,23 @@ USAGE_LIMITS = UsageLimits(request_limit=8)
 
 # Routes whose requests carry no personal data: the market report reads public news and closes (decision 27), and a
 # cloud chat or web turn gets no profile memory (core.turn). The schedule, notes, money and mail never leave this machine.
-CLOUD_OK = frozenset({"chat", "web", "markets"})
+def cloud_ok() -> frozenset[str]:
+    """The assistants with Module.cloud (modules.py, outside modules included once loaded) and the market report."""
+    return frozenset({*modules.names("cloud"), "markets"})
+
+
+CLOUD_OK = cloud_ok()  # the built-in ones, for the settings page
 # What may run on Claude (the user's own subscription, signed in on this machine): the assistants without money or mail
 # and the jobs whose input is theirs. 'plan' is the planner (it reads the message, and runs on Claude only when no step
 # is money or mail); 'summary' and 'learn' fold and learn a route's turns (on Claude only when that route is too);
 # 'code' is a coding job's loop. Wired but refused: money, mail, the workflows, and 'describe' (a document's card:
-# the document may be a bank statement or a mail attachment). Adding one here is the whole switch.
-CLAUDE_OK = frozenset({"life", "chat", "web", "pc", "plan", "summary", "learn", "code"})
+# the document may be a bank statement or a mail attachment). An assistant's switch is Module.claude.
+def claude_ok() -> frozenset[str]:
+    """The assistants with Module.claude (modules.py) and the jobs above."""
+    return frozenset({*modules.names("claude"), "plan", "summary", "learn", "code"})
+
+
+CLAUDE_OK = claude_ok()
 DEEPINFRA_URL = "https://api.deepinfra.com/v1/openai"
 # OpenRouter: only zero-retention endpoints of providers that don't train on prompts, that support every parameter
 # sent (tools, the market report's JSON schema), and not the 4-bit ones (a weaker copy of the same model).
@@ -127,13 +137,13 @@ def build_claude_model(settings: Settings) -> Model:
 
 
 def claude_routes(settings: Settings) -> frozenset[str]:
-    """FRANZISKA_CLAUDE_ROUTES, 'all' expanded; a route outside CLAUDE_OK refuses to start."""
+    """FRANZISKA_CLAUDE_ROUTES, 'all' expanded; a route outside claude_ok() refuses to start."""
     if not settings.claude_model:
         return frozenset()
-    routes = CLAUDE_OK if "all" in settings.claude_routes else settings.claude_routes
-    if refused := routes - CLAUDE_OK:
+    routes = claude_ok() if "all" in settings.claude_routes else settings.claude_routes
+    if refused := routes - claude_ok():
         raise ValueError(f"FRANZISKA_CLAUDE_ROUTES: {', '.join(sorted(refused))} may not run on Claude "
-                         f"(allowed: {', '.join(sorted(CLAUDE_OK))})")
+                         f"(allowed: {', '.join(sorted(claude_ok()))})")
     return routes
 
 
@@ -147,9 +157,9 @@ class Models:
         self._claude_routes: dict[str, Model] = {}
         self.local = local or build_model(settings)
         if settings.cloud_model and not settings.cloud_everywhere:
-            if refused := settings.cloud_routes - CLOUD_OK:
+            if refused := settings.cloud_routes - cloud_ok():
                 raise ValueError(f"FRANZISKA_CLOUD_ROUTES: {', '.join(sorted(refused))} never leave this machine "
-                                 f"(allowed: {', '.join(sorted(CLOUD_OK))})")
+                                 f"(allowed: {', '.join(sorted(cloud_ok()))})")
         self._base = build_cloud_model(settings) if settings.cloud_model else None
         self.claude_on = claude_routes(settings)
         self._claude = build_claude_model(settings) if self.claude_on else None

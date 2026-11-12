@@ -53,22 +53,28 @@ The demo needs nothing of yours. Its chat needs a local model (below); the agend
 ## Set it up
 
 ```bash
-uv run python -m franziska init                        # asks a few questions, writes ~/.config/franziska/.env
-uv run python -m franziska.sandbox bootstrap           # the isolated runtime for run_python
-uv run --env-file .env python -m franziska doctor      # every piece: ✅ / ⚠️ / ❌ with the fix
-uv run --env-file .env python -m franziska.bot         # Telegram; send /whoami, put your id in the config
-uv run --env-file .env python -m franziska.web         # the web app on 127.0.0.1:8765
+uv run python -m franziska.web      # then open http://127.0.0.1:8765
 ```
+
+The web app opens on **Setup**: one card per piece, each saying what it adds, whether it works, and how to turn it
+on, from the page. It needs the language model and a time zone; everything else is optional. Without Google it keeps
+appointments in its own calendar; without Telegram it is the web app alone (Telegram is how reminders and the morning
+brief reach your phone). The page installs the services so Franziska starts at login, and restarts them when you
+change something.
+
+In a terminal instead: `python -m franziska init` asks the same questions, and
+`uv run --env-file .env python -m franziska doctor` checks every piece (✅ / ⚠️ / ❌ with the fix).
 
 **Needs:** Linux, Python 3.12 and [uv](https://docs.astral.sh/uv/), a local model server. Measured on an RTX 3060
 (12 GB) with gemma-4-26B-A4B on llama.cpp (`deploy/franziska-llm.service`); with less VRAM, Ollama and `gemma4:12b`.
-`init` picks one from your GPU. Always-on setups (a small box that wakes the GPU desktop when a message needs it) are
-in `deploy/BOX.md`.
+Setup suggests one from your GPU. Always-on setups (a small box that wakes the GPU desktop when a message needs it)
+are in `deploy/BOX.md`.
 
-**Optional, each one setting:** Telegram (a bot token), Google Calendar and Gmail (your own OAuth client), the mail
-agent ([gogcli](https://github.com/openclaw/gogcli)), SearXNG, an embedding server for search by meaning, voice notes,
-the market report, Claude on your own subscription for the life and chat routes, a cloud model for chat. All in
-[`.env.example`](.env.example), each with its comment.
+**Optional:** Telegram (a bot token), Google Calendar and Gmail (a Google Cloud app of your own: Google requires one
+for Gmail access, Setup walks you through it), the mail agent ([gogcli](https://github.com/openclaw/gogcli), the same
+Google app), SearXNG, an embedding server for search by meaning, voice notes, the market report, Claude on your own
+subscription for the life and chat routes, a cloud model for chat. All in [`.env.example`](.env.example), each with
+its comment.
 
 ## Numbers
 
