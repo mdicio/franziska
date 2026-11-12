@@ -5,7 +5,7 @@ Two kinds, with different jobs:
 - **Model comparison** (which model, which settings): `bench`, `mail_eval`, `router_eval`, the speed bench, all
   driven by `funnel` (cheap stages first, expensive ones for the survivors) and, for a planned series of runs,
   `campaign`. Same tasks on every model, scored automatically, results kept per model so a new one only adds rows.
-- **The bot itself** (does Franziska work): `week`, `memory`,
+- **The bot itself** (does Franziska work): `week`, `memory`, `xturn`,
   `library`, `sandbox`. The real router, agents and guards, judged on the stores afterwards. The author also runs
   longer evals on a copy of their own data (a real week and month, `realweek`, `realmonth`, `monthsim`); those stay
   private with their reports, and code comments cite their findings by name and date.

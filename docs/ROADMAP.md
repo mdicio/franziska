@@ -18,8 +18,16 @@ What real use shows is failing: references across turns and routes (an earlier c
 ## Next, in order
 
 1. **Cross-turn context**: past conversations across routes with better matching, attachments that
-   outlive their turn, referents passed to planned steps.
-2. **Measure with a simulated user**: a stronger model plays you; judge on state. Add every real miss.
+   outlive their turn, referents passed to planned steps. Done 2026-11-01 and 2026-11-12: search across routes by
+   words and meaning, documents kept in the library, the chat's thread in every run and planner step. A follow-up to
+   a turn whose data the route's model may not see (life on Claude after money read a bill) runs on the local model,
+   is logged as seen as that route (`turns.seen_as`) and stays out of the route's history; so does a plan step or an
+   `ask` that would carry such data to Claude. A figure from the route's own earlier turns counts as backed. A
+   merged plan step that needs earlier results runs after them. Accepted: on Claude, a reference to money or mail
+   data past the 15-minute follow-up window finds nothing (the privacy table decides; relax it in `FRANZISKA_SEES`
+   or keep that route local). Measured by `evals/xturn.py`.
+2. **Measure with a simulated user**: a stronger model plays you; judge on state. Add every real miss. The first
+   cases are `evals/xturn.py`.
 3. **Typed money answers and delegation**: `check_payment`, then life ↔ money asks, the full planner.
 4. **Real-data checks of what exists**: the library on real documents, `run_python` and coding jobs for a week, a week
    of market reports.

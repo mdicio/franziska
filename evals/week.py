@@ -76,7 +76,8 @@ class Say(Step):
 
 @dataclass
 class Job(Step):
-    job: str = ""  # 'brief' | 'evening' | 'review' | 'expire' | 'consolidate'
+    job: str = ""  # 'brief' | 'evening' | 'review' | 'expire' | 'consolidate', or a name for `run`
+    run: Callable[[World], None] | None = None  # an eval's own job (seed a store mid-run), instead of a bot one
 
 
 @dataclass
@@ -90,6 +91,14 @@ class Cmd(Step):
     text: str = ""  # '/memory scarpe': a command and its args, answered without the router
 
 
+@dataclass
+class Doc(Step):
+    name: str = ""  # a file the user sends (bot.on_document), with an optional caption
+    data: bytes = b""
+    mime: str = ""
+    caption: str = ""
+
+
 def say(at, text, route=None, *checks, known=""):
     return Say(at, list(checks), route, known, text=text)
 
@@ -98,8 +107,12 @@ def cmd(at, text, *checks, known=""):
     return Cmd(at, list(checks), known=known, text=text)
 
 
-def job(at, name, *checks):
-    return Job(at, list(checks), job=name)
+def job(at, name, *checks, run=None):
+    return Job(at, list(checks), job=name, run=run)
+
+
+def doc(at, name, data, route=None, *checks, mime="", caption="", known=""):
+    return Doc(at, list(checks), route, known, name=name, data=data, mime=mime, caption=caption)
 
 
 def tap(at, message, button, *checks, known=""):
@@ -297,6 +310,18 @@ class Chat:
         u.callback_query = query
         return u
 
+    def document(self, name: str, data: bytes, mime: str = "", caption: str = "") -> MagicMock:
+        u = self.update()
+        msg = u.effective_message
+        msg.photo, msg.caption = [], caption
+        msg.document.file_name, msg.document.mime_type = name, mime
+
+        async def download_to_drive(path):
+            Path(path).write_bytes(data)
+
+        msg.document.get_file = AsyncMock(return_value=SimpleNamespace(download_to_drive=download_to_drive))
+        return u
+
     def tap(self, message: str, label: str) -> MagicMock | None:
         """A callback update for the latest message matching `message` with a button matching `label`."""
         for msg in reversed(self.sent):
@@ -407,6 +432,11 @@ class World:
         self.route = None
         if isinstance(s, Say):
             await botmod.traced(self.bot.on_text)(self.chat.update(s.text), self.chat.context)
+        elif isinstance(s, Doc):
+            await botmod.traced(self.bot.on_document)(self.chat.document(s.name, s.data, s.mime, s.caption),
+                                                      self.chat.context)
+        elif isinstance(s, Job) and s.run:
+            s.run(self)
         elif isinstance(s, Job):
             await {"brief": self.bot.send_brief, "evening": self.bot.send_evening,
                     "expire": self.bot.nightly, "review": self.bot.send_review,
@@ -473,8 +503,8 @@ def run(until: str = "sun", model: str = "", log=print, steps: list[Step] | None
     if claude:
         settings = dataclasses.replace(settings, claude_model=claude, claude_routes=claude_routes)
     label = f"{cloud} (cloud, every route)" if cloud else settings.model
-    if claude:
-        label = f"Claude {claude} on {', '.join(sorted(claude_routes))}, else {label}"
+    if settings.claude_model and settings.claude_routes:  # passed in, or FRANZISKA_CLAUDE_ROUTES from .env
+        label = f"Claude {settings.claude_model} on {', '.join(sorted(settings.claude_routes))}, else {label}"
     steps = WEEK if steps is None else steps
     if not live and until != "sun":
         steps = [s for s in steps if DAYS.index(s.at.split()[0]) <= DAYS.index(until)]
@@ -564,6 +594,8 @@ def _label(s: Step) -> str:
         return s.text
     if isinstance(s, Job):
         return f"[{s.job} job]"
+    if isinstance(s, Doc):
+        return f"[{s.name}]" + (f" {s.caption}" if s.caption else "")
     return f"[tap /{s.button}/ on /{s.message}/]"
 
 
