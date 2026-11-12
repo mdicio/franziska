@@ -57,6 +57,7 @@ main { min-width: 0; min-height: 0; }
 .ghost { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 14px;
   font-size: 13px; color: var(--muted); }
 .ghost:hover { color: var(--ink); border-color: var(--muted); }
+label.ghost { display: inline-block; cursor: pointer; }
 .bar-note { color: var(--muted); font-size: 13px; }
 .ghost.icon { padding: 2px 12px; font-size: 18px; line-height: 1.3; }
 

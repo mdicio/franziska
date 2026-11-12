@@ -13,16 +13,22 @@ with sudo; a step that needs a system package says the command instead.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
+import shlex
 import shutil
+import subprocess
+import time
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
 from franziska import setup as cli
 from franziska.config import ROOT, Settings
+from franziska.google import auth as google_auth
 from franziska.web import control
 
 TELEGRAM = "https://api.telegram.org"
@@ -46,7 +52,7 @@ FIELDS = {
                                  help="On another disk or a mounted drive: the nightly copy of every store."),
     "FRANZISKA_GOOGLE": dict(label="Google Calendar and Gmail", kind="bool", help=""),
     "FRANZISKA_GOG_ACCOUNT": dict(label="Gmail address for the mail assistant", kind="email",
-                                  help="The account you signed in with `gog auth add`. Empty turns it off."),
+                                  help="Set by the Google sign-in above. Empty turns the mail assistant off."),
     "FRANZISKA_PC": dict(label="The PC assistant", kind="bool",
                          help="Questions about this computer, its files, coding jobs. Each change is a button."),
 }
@@ -299,33 +305,37 @@ def backups_step(s: Settings, env: dict) -> dict:
 
 
 def google_step(s: Settings, env: dict) -> dict:
+    client, signed = google_client(s).exists(), s.google_token.exists()
     how = ["Optional: without it appointments live in Franziska's own calendar, and everything else works.",
            "Google needs an app of your own in Google Cloud (free, about 10 minutes, once): console.cloud.google.com "
-           "→ new project → enable the Google Calendar API and the Gmail API → OAuth consent screen: External, add "
-           "your address as a user, then Publish app (in Testing, Google signs you out every 7 days) → Credentials → "
-           "Create OAuth client ID → Desktop app → download the JSON.",
-           "Turn it on above, save, then sign in once with the command below (it prints a link to open)."]
-    signed = s.google_token.exists()
-    state = "off" if not s.google else "done" if signed else "problem"
-    return step("google", "Google Calendar and Gmail", "Appointments in your Google Calendar (your phone shows them), "
-                "new mail triaged and pushed to the chat, bills found in your inbox.", state,
-                "Signed in" if state == "done" else "Turned on, but not signed in yet" if s.google else "Off",
-                fields=[field("FRANZISKA_GOOGLE", env)], how=how,
-                commands=["uv run --with google-auth-oauthlib==1.5.0 python -m franziska.google.auth "
-                          "~/Downloads/client_secret_….json"], restart=("bot", "web"))
+           "→ new project → enable the Google Calendar, Gmail, Drive, Docs and Sheets APIs → Google Auth Platform: "
+           "External, add your address as a test user, then Publish app (in Testing, Google signs you out every 7 "
+           "days) → Clients → Create client → Desktop app → download the JSON.",
+           "Upload that file here, then sign in once. With gog installed (the mail assistant, below), the same "
+           "sign-in sets it up too."]
+    state = "done" if s.google and signed else "problem" if s.google else "off"
+    who = google_account(s)
+    detail = (f"Signed in{f' as {who}' if who else ''}" + ("" if s.google else ", but turned off above")
+              if signed else "Turned on, but not signed in yet" if s.google else "Off")
+    actions = [("google_signin", "Sign in with Google" if not signed else "Sign in again")] if client else []
+    out = step("google", "Google Calendar and Gmail", "Appointments in your Google Calendar (your phone shows them), "
+               "new mail triaged and pushed to the chat, bills found in your inbox.", state, detail,
+               fields=[field("FRANZISKA_GOOGLE", env)], how=how, actions=actions, restart=("bot", "web"))
+    out["upload"] = {"id": "google_client", "accept": ".json,application/json", "saved": client,
+                     "label": "Replace the app's JSON" if client else "Upload the app's JSON"}
+    return out
 
 
 def mail_step(s: Settings, env: dict) -> dict:
-    gog = shutil.which(s.mail_gog.split()[0])
+    gog = _gog(s)
     state = "off" if not s.gog_account else "done" if gog else "problem"
+    how = ([] if gog else ["Install gogcli (github.com/openclaw/gogcli) so `gog` is on the PATH."]) + [
+        "Then sign in with Google above: the same sign-in gives gog your Google app and access, with no second "
+        "sign-in."]
     return step("mail", "Mail assistant", "Ask about your email: find a message, summarise a thread, draft a reply "
                 "(it never sends), Drive, Docs and Sheets.", state,
                 (f"For {s.gog_account}" if gog else "gog isn't on the PATH") if s.gog_account else "Off",
-                fields=[field("FRANZISKA_GOG_ACCOUNT", env)],
-                how=["Uses gogcli (github.com/openclaw/gogcli) with the same Google app as above: install it, give it "
-                     "the JSON, sign in, then put the address here."],
-                commands=["gog auth credentials set ~/Downloads/client_secret_….json", "gog auth add you@gmail.com"],
-                restart=("bot", "web"))
+                fields=[field("FRANZISKA_GOG_ACCOUNT", env)], how=how, restart=("bot", "web"))
 
 
 async def overview() -> dict:
@@ -430,6 +440,106 @@ async def install_services() -> dict:
             raise ValueError(f"{name}: {out}")
     names = ", ".join(n.removesuffix(".service") for n in started)
     return {"say": f"Started {names}. If you ran this page from a terminal, close it now: the service takes over."}
+
+
+# ---- Google: one sign-in for Franziska and the mail assistant (gog) -------------------------------------------------
+# The OAuth client is the user's own Desktop app (google/auth.py), uploaded here. Google sends the browser back to a
+# loopback address: this page's own when it is open on this machine (the code arrives by itself, CALLBACK), else
+# 127.0.0.1 on the user's device, which doesn't load; they paste that address into the page (google_finish).
+CALLBACK = "/api/setup/google/callback"
+SIGN_IN_S = 15 * 60
+_pending: dict[str, tuple[str, str, list[str], float]] = {}  # state → (verifier, redirect, scopes, started)
+
+
+def google_client(s: Settings) -> Path:
+    return s.data_dir / "google_client.json"
+
+
+def google_account(s: Settings) -> str:
+    try:
+        return json.loads(s.google_token.read_text()).get("account", "")
+    except (OSError, ValueError):
+        return ""
+
+
+def _gog(s: Settings) -> list[str] | None:
+    """The gog command (FRANZISKA_MAIL_GOG), when it is installed."""
+    command = shlex.split(s.mail_gog)
+    return command if command and shutil.which(command[0]) else None
+
+
+def google_upload(data: bytes) -> dict:
+    s = saved()
+    client = google_auth.read_client(data)
+    path = google_client(s)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch(mode=0o600)
+    os.chmod(path, 0o600)
+    path.write_text(json.dumps({"installed": client}))
+    return {"say": "Saved. Now sign in with Google."}
+
+
+def google_signin(origin: str) -> dict:
+    """The consent page's address for this page (`origin`: its scheme://host:port), asking for the mail
+    assistant's access too when gog is installed."""
+    s = saved()
+    if not google_client(s).exists():
+        raise ValueError("Upload the app's JSON first.")
+    client = google_auth.read_client(google_client(s).read_bytes())
+    here = urlsplit(origin)
+    local = here.scheme == "http" and here.hostname in ("127.0.0.1", "localhost", "::1")
+    redirect = f"{origin.rstrip('/')}{CALLBACK}" if local else f"http://127.0.0.1:{s.web_port}{CALLBACK}"
+    scopes = google_auth.SCOPES + (google_auth.MAIL_SCOPES if _gog(s) else [])
+    url, state, verifier = google_auth.sign_in_url(client, redirect, scopes)
+    now = time.time()
+    for k in [k for k, v in _pending.items() if now - v[3] > SIGN_IN_S]:
+        del _pending[k]
+    _pending[state] = (verifier, redirect, scopes, now)
+    return {"link": url, "paste": not local,
+            "say": "Sign in and allow everything Google asks."
+                   + ("" if local else " The browser then ends on a page that doesn't load: copy its address from "
+                                       "the address bar into the field below.")}
+
+
+def google_finish(address: str) -> dict:
+    """The address Google sent the browser back to (or its query): the tokens saved for Franziska, gog given the
+    same app and refresh token (`gog auth import`), Google and the mail assistant turned on."""
+    query = parse_qs(urlsplit(address.strip()).query or address.strip().lstrip("?"))
+    if error := query.get("error", [""])[0]:
+        raise ValueError(f"Google didn't sign you in ({error}). Press Sign in again.")
+    code, state = query.get("code", [""])[0], query.get("state", [""])[0]
+    if not code or state not in _pending:
+        raise ValueError("That isn't the address of this sign-in (or it is over 15 minutes old). Press Sign in again.")
+    verifier, redirect, scopes, _ = _pending.pop(state)
+    s = saved()
+    client = google_auth.read_client(google_client(s).read_bytes())
+    body = google_auth.finish(client, code, redirect, verifier, s.google_token)
+    granted = set(body.get("scope", "").split())
+    who = google_auth.account(body["access_token"])
+    info = json.loads(s.google_token.read_text())
+    s.google_token.write_text(json.dumps({**info, "account": who}))
+    say = [f"Signed in as {who}."]
+    if missing := [x.rsplit("/", 1)[-1] for x in google_auth.SCOPES if x not in granted]:
+        say.append(f"Not allowed: {', '.join(missing)}, so that part won't work. Sign in again to allow it.")
+    changes = {"FRANZISKA_GOOGLE": "1"}
+    if gog := _gog(s):
+        if lacking := [x.rsplit("/", 1)[-1] for x in google_auth.MAIL_SCOPES if x not in granted]:
+            say.append(f"The mail assistant stays off: not allowed {', '.join(lacking)}.")
+        else:
+            env = {**os.environ, **control.read_env()}  # GOG_KEYRING_* from .env, as the services see them
+            # --force: signing in again replaces gog's token for this address (it refuses otherwise).
+            for args, given in (([*gog, "auth", "credentials", "set", str(google_client(s)), "--no-input"], None),
+                                ([*gog, "auth", "import", "--email", who, "--refresh-token-stdin", "--services",
+                                  google_auth.GOG_SERVICES, "--no-input", "--force"], body["refresh_token"])):
+                done = subprocess.run(args, input=given, capture_output=True, text=True, env=env, timeout=60)
+                if done.returncode:
+                    tail = (done.stderr or done.stdout).strip().splitlines()[-1:] or ["no output"]
+                    raise ValueError(f"Signed in for Franziska, but gog refused the token: {tail[0]}")
+            changes["FRANZISKA_GOG_ACCOUNT"] = who
+            say.append("The mail assistant uses the same sign-in.")
+    save(changes)
+    say.append("Restart the bot and the web app to use it.")
+    return {"say": " ".join(say), "restart": ["bot", "web"]}
 
 
 ACTIONS = {"telegram_check": telegram_check, "telegram_find": telegram_find, "sandbox_install": sandbox_install,

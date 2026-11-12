@@ -765,7 +765,18 @@ function renderSetup(page, d) {
       const b = e.currentTarget, label = b.textContent; b.disabled = true; b.textContent = "Working…";
       try {
         const r = await api(`/api/setup/${a.id}`, { method: "POST" });
-        if (r.people) {
+        if (r.link) {  // a sign-in in another tab; it comes back by itself, or the user pastes where it ended
+          const address = h("input", { type: "text", spellcheck: "false", autocomplete: "off", placeholder: "http://127.0.0.1:…/api/setup/google/callback?…", "aria-label": "The address the browser ended on" });
+          const finish = h("button", { class: "run", type: "button", onclick: async () => {
+            finish.disabled = true;
+            try {
+              const f = await api("/api/setup/google/finish", { method: "POST", body: { address: address.value } });
+              out.replaceChildren(h("div", { class: "sub" }, f.say), f.restart?.length ? restartRow(f.restart) : "");
+            } catch (err) { toast(err.message); finish.disabled = false; }
+          } }, "Finish");
+          out.replaceChildren(h("div", { class: "sub" }, r.say, " ", h("a", { href: r.link, target: "_blank", rel: "noopener" }, "Open Google's sign-in ↗")),
+            r.paste ? h("div", { class: "wf-form" }, h("div", { class: "field" }, h("label", {}, "The address the browser ended on"), address), h("div", { class: "field inline" }, finish)) : "");
+        } else if (r.people) {
           out.replaceChildren(h("div", { class: "sub" }, "Who is you?"), h("div", { class: "tile-actions" }, r.people.map((p) =>
             h("button", { class: "ghost", type: "button", onclick: async () => {
               const ids = new Set((st.fields.find((f) => f.key === "FRANZISKA_ALLOWED_IDS")?.value || "").split(",").filter(Boolean));
@@ -784,6 +795,19 @@ function renderSetup(page, d) {
     const copy = (c) => h("div", { class: "cmd" }, h("code", {}, c), h("button", { class: "ghost", type: "button", onclick: async () => {
       try { await navigator.clipboard.writeText(c); toast("Copied."); } catch { toast("The browser didn't allow copying here."); }
     } }, "Copy"));
+    const upload = st.upload ? h("label", { class: "ghost button" }, st.upload.label, h("input", { type: "file", accept: st.upload.accept, hidden: true, onchange: async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const res = await fetch(`/api/setup/google/client`, { method: "POST", body: form });
+        const r = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(r.detail || res.statusText);
+        toast(r.say);
+        await showSetup();
+      } catch (err) { out.replaceChildren(h("div", { class: "note" }, err.message)); }
+    } })) : "";
     const open = st.required || st.state === "todo" || st.state === "problem" || setupOpen.has(st.id);
     const body = [
       h("p", { class: "step-adds" }, st.adds),
@@ -791,7 +815,7 @@ function renderSetup(page, d) {
       st.how.length ? h("ol", { class: "step-how" }, st.how.map((x) => h("li", {}, x))) : "",
       st.commands.length ? h("div", { class: "step-cmds" }, h("small", { class: "sub" }, "In a terminal:"), st.commands.map(copy)) : "",
       fields.length ? h("div", { class: "wf-form" }, fields, h("div", { class: "field inline" }, save)) : "",
-      st.actions.length ? h("div", { class: "tile-actions" }, st.actions.map(act)) : "",
+      upload || st.actions.length ? h("div", { class: "tile-actions" }, upload, st.actions.map(act)) : "",
       out];
     return h("details", { class: `card step s-${st.state}`, "data-step": st.id, open: open || null,
       ontoggle: (e) => { e.currentTarget.open ? setupOpen.add(st.id) : setupOpen.delete(st.id); } },

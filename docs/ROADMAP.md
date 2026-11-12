@@ -53,19 +53,19 @@ Done 2026-11-12:
   folder, not `~/franziska`) install from it. Secrets are write-only. Tested as a stranger: a copy of the repo under
   an empty home, no .env.
 
+- **One Google sign-in, from the Setup page** (2026-11-12): upload the Google app's JSON, one consent in the browser
+  (back by itself on this machine; from another device, paste the address the browser ends on), and the refresh
+  token serves both Franziska and gog (`gog auth credentials set`, `gog auth import --force`), which also sets the
+  mail account. Google stays optional, and needs a Google Cloud app of the user's own (gog has none either; a shared
+  app would need Google's verification and, for Gmail, a yearly audit).
+
 Next, in order (what stops a stranger from using it, biggest first):
-1. **One Google sign-in, from the Setup page.** Google stays optional: without it Franziska keeps its own calendar and
-   the mail assistant is off; there is no replacement for Gmail. Gmail can't be reached without a Google Cloud app of
-   the user's own (gog too: it has no app of its own, and a shared app would need Google's verification and, for
-   Gmail, a yearly security audit). So the page makes that one-time part short: upload the downloaded JSON, one
-   consent in the browser, and the token serves both Franziska and gog (`gog auth credentials set`, `gog auth import`).
-   Today it is two terminal sign-ins.
-2. **Reminders without Telegram**: the scheduler lives in the bot, which needs a token; a web-only install has no
+1. **Reminders without Telegram**: the scheduler lives in the bot, which needs a token; a web-only install has no
    reminders. Run the jobs without Telegram and push to the installed web app (or ntfy).
-3. **Modules, second cut**: an outside module's planner steps and background jobs; `/<module>` to pin a route.
-4. **Hardware**: say plainly what works without a 12 GB GPU (Ollama and a small model, the cloud model per route) and
+2. **Modules, second cut**: an outside module's planner steps and background jobs; `/<module>` to pin a route.
+3. **Hardware**: say plainly what works without a 12 GB GPU (Ollama and a small model, the cloud model per route) and
    measure the router there.
-5. A short screen recording of the Telegram chat in the README.
+4. A short screen recording of the Telegram chat in the README.
 
 ## Later
 

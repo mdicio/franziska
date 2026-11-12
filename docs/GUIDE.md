@@ -109,7 +109,8 @@ message needs it. While the desktop is off, `FRANZISKA_WHEN_OFF` decides:
 Money waits for the desktop in every policy (a chat pinned to /money is never sent to the cloud), and so does mail
 triage. `/desktop` shows its state; `/desktop wake` wakes it.
 
-With `FRANZISKA_GOOGLE=1` and a one-time sign-in (`python -m franziska.google.auth`, see BOX.md):
+With a one-time sign-in on the web app's Setup page (upload your Google app's JSON, sign in; or in a terminal,
+`python -m franziska.google.auth`, see BOX.md):
 - **Calendar (read/write)**: appointments are created, moved and cancelled in Google Calendar; your phone gets the
   notifications. The box mirrors the next 120 days every 5 minutes, so agenda and brief are instant and show
   appointments as `#c5` next to tasks (`#12`). Tasks, notes and money stay local.
@@ -176,10 +177,13 @@ The model is the bot's own (gemma-4-26B-A4B on llama-server, below) unless `FRAN
 `FRANZISKA_MAIL_BASE_URL` point elsewhere. `FRANZISKA_MAIL_THINKING` (default on), `FRANZISKA_MAIL_REASONING`
 (template `reasoning_effort`, llama-server only). Which model: measured in `MODEL_NOTES.md`, not guessed.
 
-Setup, once, with the same Desktop OAuth client as above (`~/.config/franziska/client_secret.json`):
+Setup: with `gog` on the PATH, the Google sign-in on the Setup page sets it up too. One consent asks for both sets
+of scopes; the page gives gog the same app (`gog auth credentials set`) and refresh token (`gog auth import`), and
+sets `FRANZISKA_GOG_ACCOUNT`. On a box without a desktop keyring, put `GOG_KEYRING_BACKEND=file` and
+`GOG_KEYRING_PASSWORD` in .env first. By hand instead, with the same Desktop OAuth client:
 
 ```bash
-gog auth credentials set ~/.config/franziska/client_secret.json
+gog auth credentials set ~/Downloads/client_secret_….json
 gog auth add you@gmail.com --services gmail     # opens the browser; on the box add --manual (or an SSH tunnel)
 gog --account you@gmail.com auth doctor --check
 # .env: FRANZISKA_GOG_ACCOUNT=you@gmail.com (+ GOG_KEYRING_BACKEND=file, GOG_KEYRING_PASSWORD for the service)

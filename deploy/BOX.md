@@ -111,7 +111,9 @@ so "wake when needed" also means "sleep when not".
    through). In "Testing" status refresh tokens expire after 7 days. Check the console for the current rules on
    restricted scopes (Gmail) for unverified personal apps.
 3. Credentials → Create OAuth client ID → **Desktop app** → download the JSON (keep it out of git).
-4. Sign in, on the box through an SSH tunnel so Google's redirect to `localhost:8765` reaches it:
+4. Sign in on the web app's Setup page (Google card: upload the JSON, Sign in with Google). Opened from another
+   device, the browser ends on a `127.0.0.1` page that doesn't load: paste its address into the page. Or in a
+   terminal, on the box through an SSH tunnel so Google's redirect to `localhost:8765` reaches it:
    ```bash
    ssh -L 8765:localhost:8765 box
    cd ~/franziska

@@ -35,10 +35,12 @@ import asyncio
 import contextlib
 import httpx
 import hmac
+import html
 import json
 import logging
 import re
 import sqlite3
+import subprocess
 import tempfile
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import datetime, time, timedelta
@@ -628,6 +630,39 @@ def create_app(settings: Settings, core: Core | None = None) -> FastAPI:
             return await asyncio.to_thread(onboarding.save, body.get("env") or {})
         except (ValueError, OSError) as e:
             raise HTTPException(400, str(e))
+
+    @app.post("/api/setup/google/client")
+    async def google_client(file: UploadFile):
+        """The Google Cloud app's JSON (onboarding.google_upload)."""
+        try:
+            return await asyncio.to_thread(onboarding.google_upload, await file.read(256 * 1024))
+        except (ValueError, OSError) as e:
+            raise HTTPException(400, str(e))
+
+    @app.post("/api/setup/google_signin")
+    async def google_signin(request: Request):
+        """The consent page's address; Google comes back to google_callback, or the user pastes where it ended."""
+        try:
+            return onboarding.google_signin(str(request.base_url))
+        except (ValueError, OSError) as e:
+            raise HTTPException(400, str(e))
+
+    @app.post("/api/setup/google/finish")
+    async def google_finish(body: dict):
+        try:
+            return await asyncio.to_thread(onboarding.google_finish, str(body.get("address") or ""))
+        except (ValueError, OSError, httpx.HTTPError, subprocess.SubprocessError) as e:
+            raise HTTPException(400, str(e) if not isinstance(e, httpx.HTTPError) else "Google can't be reached")
+
+    @app.get(onboarding.CALLBACK)
+    async def google_callback(request: Request):
+        """Where Google sends the browser after the consent, when the page is open on this machine."""
+        try:
+            await asyncio.to_thread(onboarding.google_finish, str(request.url))
+        except (ValueError, OSError, httpx.HTTPError, subprocess.SubprocessError) as e:
+            return HTMLResponse(f"<!doctype html><meta charset=utf-8><title>Google sign-in</title><p>{html.escape(str(e))}"
+                                "</p><p><a href='/#setup'>Back to Setup</a></p>", status_code=400)
+        return RedirectResponse("/#setup", status_code=303)
 
     @app.post("/api/setup/{action}")
     async def setup_action(action: str):
