@@ -35,7 +35,7 @@ body.asleep .orb { filter: grayscale(.7) brightness(.6); animation-duration: 8s;
 .brand { display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 8px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 #who { font-weight: 650; letter-spacing: .14em; text-transform: uppercase; font-size: 13px; }
 #state { font-size: 11.5px; color: var(--dim); letter-spacing: .04em; }
-.team { flex: 1; display: flex; gap: 8px; justify-content: center; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.team { flex: 1; min-width: 0; display: flex; gap: 8px; justify-content: safe center; overflow-x: auto; scrollbar-width: none; padding: 2px; }
 .team::-webkit-scrollbar { display: none; }
 .pill { --c: var(--lead); flex: none; display: flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); cursor: pointer; font-size: 13.5px; transition: border-color .2s, box-shadow .2s, background .2s; }
 .pill:hover { border-color: var(--c); }
@@ -145,6 +145,12 @@ textarea:focus { border-color: rgba(159, 232, 255, .55); box-shadow: 0 0 0 3px r
 body.ready .loading { opacity: 0; pointer-events: none; }
 
 /* ---- narrow screens: team bar under the name, chat as a bottom sheet, the card at the top ---- */
+/* Mid widths: the team gets its own row under the brand and the tools, so no pill is cut off at either end. */
+@media (min-width: 861px) and (max-width: 1240px) {
+  .top { flex-wrap: wrap; row-gap: 10px; }
+  .brand { margin-right: auto; }
+  .team { order: 3; flex-basis: 100%; }
+}
 @media (max-width: 860px) {
   .top { flex-wrap: wrap; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) var(--gut) 8px; }
   .brand { flex: 1; }
