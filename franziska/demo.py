@@ -2,8 +2,9 @@
 
 A scratch data directory gets three months of bank movements (a Revolut-format statement, imported by the real
 importer with its checks), spending groups and budgets, a bill that is also a reminder, a few tasks and appointments,
-notes, and the documents of the library eval (a car insurance policy, a lease, a condominium statement). Then the web
-UI starts on it. Nothing of yours is read: no Telegram, no Google, no mail, and the PC route is off.
+notes, a few things the assistants learned, and the documents of the library eval (a car insurance policy, a
+lease, a condominium statement). Then the web UI starts on it. Nothing of yours is read: no Telegram, no Google,
+no mail, and the PC route is off.
 
 Chat needs the local model (`python -m franziska doctor`); the agenda, the money pages and the documents work without.
 """
@@ -62,6 +63,8 @@ def statement(path: Path, today: date, rng: random.Random) -> None:
 
 def seed(core, today: datetime) -> list[str]:
     """Fill a fresh Core's stores; returns what was done, one line each."""
+    from franziska.finance.service import MoneyError
+
     rng = random.Random(7)
     out = []
     with tempfile.TemporaryDirectory() as tmp:
@@ -72,13 +75,13 @@ def seed(core, today: datetime) -> list[str]:
         payee = name.removeprefix("To ").upper()
         try:
             core.money.set_payee_category(payee, group)
-        except Exception:  # a payee the import named differently: left for /categorise
-            pass
+        except MoneyError:  # a payee the import named differently: left for /categorise
+            continue
     for group, eur in (("food & drink", 380), ("shopping", 120), ("leisure", 60)):
         core.money.set_budget(group, eur)
     out.append(core.money.add_bill("Condominio Via Po", 410.0, (today + timedelta(days=12)).date(), "Rata"))
     life = core.life
-    at = lambda days, h, m=0: (today + timedelta(days=days)).replace(hour=h, minute=m, second=0, microsecond=0)  # noqa
+    at = lambda days, h, m=0: (today + timedelta(days=days)).replace(hour=h, minute=m, second=0, microsecond=0)
     out.append(life.add_appointment("Dentista", at(2, 15, 30), location="Studio Bianchi, via Torino 12"))
     out.append(life.add_appointment("Cena con Sara", at(4, 20, 30), location="Trattoria Da Mario"))
     out.append(life.add_task("Rinnovare la carta d'identità", due_at=(today + timedelta(days=9)).date(),
@@ -88,6 +91,14 @@ def seed(core, today: datetime) -> list[str]:
                              priority="low"))
     out.append(life.remember("codice portone", "Il codice del portone è 1984B."))
     out.append(life.remember("misure", "Scarpe 43, camicie M."))
+    # What the assistants would have learned in a few weeks of chat (the Memory view)
+    mem = core.memory
+    mem.set_profile("lavoro", "Lavora per ACME Italia SRL; lo stipendio arriva il 27 del mese.", source="demo")
+    mem.learn("life", "dentista", "Il dentista è lo Studio Bianchi, via Torino 12.", source="demo", stated=True)
+    mem.learn("life", "orari", "Preferisce gli appuntamenti dopo le 15 nei giorni feriali.", source="demo")
+    mem.learn("money", "affitto", "L'affitto (950 €) va a Immobiliare Brera, il primo del mese.", source="demo",
+              stated=True)
+    out.append("4 things learned (Memory)")
     from evals.library_corpus import DOCS
 
     for title, pages in DOCS.items():
