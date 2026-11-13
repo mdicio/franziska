@@ -8,6 +8,11 @@ assistant in about a second and a half; the assistants act through typed tools o
 that can be computed in code (reminders, budgets, bill matching, spending summaries) is, so the model never has to be
 trusted with a number.
 
+<p align="center">
+  <img src="docs/media/demo.gif" alt="Two questions in the web app, in Italian and English, then the Today, Money and World views" width="880">
+  <br><sub>The demo on gemma-4-26B with a made-up person's data. The model's thinking time is sped up.</sub>
+</p>
+
 ![System overview](docs/diagrams/overview.svg)
 
 ## What it does
@@ -25,6 +30,26 @@ trusted with a number.
 column holds, code reads every row and checks the running balance, and you get a preview with an ✅ Import button.
 The format is saved, and the next file from that bank is imported by code alone. Intesa Sanpaolo and Revolut are
 built in; DEGIRO for investments.
+
+## The web app
+
+| | |
+|---|---|
+| ![Chat](docs/media/chat.png) | ![Today](docs/media/today.png) |
+| **Chat**: one box for everything; each reply says which assistant answered, and today's list sits beside it | **Today**: the week from your tasks and calendar, ticked off with a tap; Undo takes back the last change |
+| ![Money](docs/media/money.png) | ![Workflows](docs/media/flows.png) |
+| **Money**: balances, the month against your average, budgets, monthly charges and bills | **Workflows**: jobs that run end to end, each with its own form; what they would write waits for your tap |
+| ![Data](docs/media/data.png) | ![World](docs/media/world.jpg) |
+| **Data**: every store, read-only, with SQL (Datasette) and telemetry (Phoenix) one click away | **World**: the same chat in a 3D landscape, one place per assistant |
+
+**Memory** shows what it learned about you and each assistant's rules, which you can edit; **Code** follows the coding
+jobs; **Setup** and **Settings** change the configuration from the page; Ctrl K searches all of it. It installs as an
+app on the phone, and follows the system's dark mode.
+
+<p align="center">
+  <img src="docs/media/phone-chat.png" alt="The chat on a phone" height="420">&nbsp;&nbsp;
+  <img src="docs/media/chat-dark.png" alt="The chat in dark mode" height="420">
+</p>
 
 ## Why it's different
 
@@ -49,6 +74,13 @@ uv run python -m franziska demo      # the web app on a made-up person's data: h
 ```
 
 The demo needs nothing of yours. Its chat needs a local model (below); the agenda, money and documents work without.
+It asks Ollama for `gemma4:12b`; with llama-server instead:
+
+```bash
+FRANZISKA_BASE_URL=http://localhost:8080/v1 FRANZISKA_MODEL=gemma4-26b-a4b uv run python -m franziska demo
+```
+
+Setup and Settings are off in the demo: they would change this machine's configuration, not the demo's.
 
 ## Set it up
 
@@ -76,6 +108,44 @@ Google app), SearXNG, an embedding server for search by meaning, voice notes, th
 subscription for the life and chat routes, a cloud model for chat. All in [`.env.example`](.env.example), each with
 its comment.
 
+## Use it from code
+
+The web app is a plain HTTP API on the same port. From this machine it needs no sign-in; from anywhere else, set
+`FRANZISKA_WEB_TOKEN` and open `/login?token=…` once.
+
+```bash
+curl -N http://127.0.0.1:8765/api/chat -H 'content-type: application/json' -d '{"text": "cosa ho domani?"}'
+curl http://127.0.0.1:8765/api/today            # the week, open tasks, done today
+curl "http://127.0.0.1:8765/api/money?month=2026-11"
+```
+
+A chat answer streams as NDJSON: `status` lines while it works, then one `reply` with the text, the assistant that
+answered and its buttons.
+
+```python
+import json
+
+import httpx
+
+URL = "http://127.0.0.1:8765"
+
+with httpx.stream("POST", f"{URL}/api/chat", json={"text": "cosa ho domani?"}, timeout=None) as r:
+    for line in r.iter_lines():
+        event = json.loads(line)
+        if event["type"] == "status":
+            print("…", event["text"])  # "Choosing an assistant…", "📅 Life · thinking…"
+        elif event["type"] == "reply":
+            print(event["label"], event["text"])
+            for button in event["actions"]:  # proposals and choices: POST /api/action {"id": ...} taps one
+                print("  [", button["label"], "]", button["id"])
+
+today = httpx.get(f"{URL}/api/today").json()
+print([item["title"] for item in today["week"]])
+```
+
+Every endpoint (workflows, tasks, memory, rules, data) is in [WEB.md](docs/WEB.md#3-api). For Claude Code, Codex or
+pi, the MCP server is the better door: `python -m franziska.mcp_server` (the schedule, never the money).
+
 ## Numbers
 
 - Routing: ~1.4 s a message over 7 routes on gemma-4-26B (llama-server, RTX 3060).
@@ -91,6 +161,7 @@ its comment.
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | start here: the pieces, the technologies, the life of a message, with diagrams |
 | [GUIDE.md](docs/GUIDE.md) | the full manual: every assistant, job, command and setting |
 | [COMMANDS.md](COMMANDS.md) | every Telegram command and CLI |
+| [WEB.md](docs/WEB.md) | the web app and its HTTP API |
 | [DESIGN.md](docs/DESIGN.md) | why: the numbered design decisions and what measurements decided them |
 | [SECURITY.md](SECURITY.md) | the privacy model and its limits |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | adding a bank, a workflow or an assistant |
