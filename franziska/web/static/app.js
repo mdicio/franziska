@@ -704,6 +704,8 @@ let setupOpen = new Set();  // the optional steps the user opened, kept across r
 
 // No configuration yet, or the language model isn't answering: open on Setup instead of an empty chat.
 async function firstRun() {
+  // The demo: Setup and Settings would show and change this machine's own configuration, not the demo's.
+  if (status?.demo) { for (const v of ["setup", "settings"]) $(`.nav a[data-view="${v}"]`).hidden = true; return; }
   try {
     const d = await api("/api/setup");
     $("#nav-setup").classList.toggle("unread", !d.ready);

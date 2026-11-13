@@ -119,5 +119,5 @@ def main(port: int = 8766) -> int:
         print("  " + line.splitlines()[0][:110], flush=True)
     print(f"\nOpen http://127.0.0.1:{port}  ·  try: 'quanto ho speso questo mese?', 'cosa ho domani?', "
           "'cosa dice il contratto d'affitto sul deposito?'  ·  Ctrl+C to stop", flush=True)
-    uvicorn.run(create_app(settings, core), host="127.0.0.1", port=port, log_level="warning")
+    uvicorn.run(create_app(settings, core, demo=True), host="127.0.0.1", port=port, log_level="warning")
     return 0

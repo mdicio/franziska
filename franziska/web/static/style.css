@@ -37,6 +37,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .nav a:hover { background: var(--sunk); color: var(--ink); }
 .nav a.on { background: var(--accent-soft); color: var(--accent); }
 .nav a { position: relative; }
+.nav a[hidden] { display: none; }
 .nav a.unread::after { content: ""; position: absolute; top: 9px; left: 26px; width: 8px; height: 8px; border-radius: 50%;
   background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
 .desk { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line);
@@ -384,6 +385,8 @@ kbd { font: 11px ui-monospace, Menlo, monospace; color: var(--muted); border: 1p
 .nav-tools { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .nav-tools::before { content: "Tools"; padding: 0 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; color: var(--muted); }
+/* Phone: the tab bar has no room for these; this sits after their rules, which would otherwise win over the phone block. */
+@media (max-width: 760px) { .find, .nav-tools { display: none; } }
 .nav a.tool::after { content: "↗"; margin-left: auto; font-size: 12px; opacity: .5; }
 .nav a.tool i.tdot { order: 3; }
 .tdot { width: 7px; height: 7px; border-radius: 50%; background: transparent; flex: none; display: inline-block; }

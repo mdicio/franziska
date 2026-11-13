@@ -537,7 +537,9 @@ def item(t, now: datetime) -> dict:
             "overdue": bool(t.kind == "task" and t.due_end and t.due_end < iso(now)), "google": False}
 
 
-def create_app(settings: Settings, core: Core | None = None) -> FastAPI:
+def create_app(settings: Settings, core: Core | None = None, demo: bool = False) -> FastAPI:
+    """`demo`: the made-up person's data (franziska.demo). Setup, Settings and the services read and write this
+    machine's real .env and systemd units, not the demo's scratch folder, so they are off."""
     web = Web(core or Core(settings))
     phoenix = tools.Phoenix(settings.otlp)
     local_model = tools.LocalModel()
@@ -561,6 +563,9 @@ def create_app(settings: Settings, core: Core | None = None) -> FastAPI:
     @app.middleware("http")
     async def gate(request: Request, call_next):
         path = request.url.path
+        if demo and path.startswith(("/api/setup", "/api/settings", "/api/services", onboarding.CALLBACK)):
+            return JSONResponse({"detail": "not in the demo: run python -m franziska.web to set up your own"},
+                                status_code=403)
         if trusted(request) or path.startswith(OPEN):
             response = await call_next(request)
             if path.startswith("/static/"):  # revalidate (ETag): a new version shows on the next load
@@ -719,7 +724,8 @@ def create_app(settings: Settings, core: Core | None = None) -> FastAPI:
                 "mode": core.mode(web.state), "modes": list(MODES) if core.router else ["life", "money"],
                 "labels": core.labels, "busy": web.lock.locked(),
                 "google": bool(core.life.calendar), "today": core.life.now().date().isoformat(),
-                "tokens": web.state.get("context"), "window": await asyncio.to_thread(core.context_window)}
+                "tokens": web.state.get("context"), "window": await asyncio.to_thread(core.context_window),
+                "demo": demo}
 
     @app.get("/api/reports/{name}")
     async def report(name: str):
