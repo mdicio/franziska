@@ -18,6 +18,7 @@ same blob Ollama serves, so prompts, label ids and the model's weights all come 
 from __future__ import annotations
 
 import json
+import urllib.error
 import urllib.request
 from collections.abc import Sequence
 
@@ -38,8 +39,18 @@ def ollama_model_blob(model: str, base_url: str = "http://localhost:11434") -> s
 
 def _post(url: str, body: dict, timeout: float) -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:  # Ollama says why in the body; a bare "HTTP Error 500" doesn't
+        try:
+            said = str(json.load(e).get("error", ""))
+        except ValueError:
+            said = ""
+        if "out of memory" in said:
+            raise RuntimeError(f"Ollama can't load {body.get('model', 'the model')}: the GPU is out of memory "
+                               "(is another model server, e.g. llama-server, holding it?)") from e
+        raise RuntimeError(f"Ollama HTTP {e.code}: {said.splitlines()[0][:200] if said else e.reason}") from e
 
 
 class OllamaBackend:

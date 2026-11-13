@@ -202,9 +202,19 @@ def checks(s: Settings) -> list[tuple[str, str, str]]:
         if r is None:
             add(BAD, "model server", f"no Ollama at {s.ollama_url}: install it, or set FRANZISKA_BASE_URL")
         else:
-            names = {m.get("name", "") for m in r.json().get("models", [])}
-            if s.model in names or f"{s.model}:latest" in names:
+            sizes = {m.get("name", ""): m.get("size", 0) for m in r.json().get("models", [])}
+            size = sizes.get(s.model) or sizes.get(f"{s.model}:latest")
+            if size is not None:
                 add(OK, "model server", f"Ollama with {s.model}")
+                # Another server (llama-server) holding the GPU: Ollama then fails every call with HTTP 500.
+                loaded = _get(s.ollama_url + "/api/ps")
+                running = loaded is not None and any(m.get("name") in (s.model, f"{s.model}:latest")
+                                                     for m in loaded.json().get("models", []))
+                free = [g.total_mb - g.used_mb for g in gpus()]
+                if not running and free and max(free) * 2**20 < size + 2**30:
+                    add(WARN, "GPU memory", f"{max(free) / 1024:.1f} GB free, {s.model} needs "
+                                            f"~{size / 2**30 + 1:.0f} GB: stop the other model server "
+                                            "(llama-server?), or Ollama fails to load it")
             else:
                 add(BAD, "model", f"Ollama runs, but {s.model} isn't pulled: ollama pull {s.model}")
     found = gpus()
