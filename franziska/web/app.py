@@ -33,7 +33,6 @@ words` typed in the chat runs it like the Telegram command.
 
 import asyncio
 import contextlib
-import httpx
 import hmac
 import html
 import json
@@ -45,8 +44,10 @@ import tempfile
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import datetime, time, timedelta
 from pathlib import Path
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs
+from urllib.parse import quote as url_quote
 
+import httpx
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -156,8 +157,8 @@ class Web:
             try:
                 relative = path.resolve().relative_to(root)
             except ValueError:
-                return f"/api/reports/{quote(path.name)}"
-            return f"/api/artifacts/{quote(str(relative))}"
+                return f"/api/reports/{url_quote(path.name)}"
+            return f"/api/artifacts/{url_quote(str(relative))}"
 
         def shown(p: Path) -> str:  # a chart inline (app.js `rich`), anything else as a link
             image = p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp") and "/api/artifacts/" in link(p)
@@ -475,6 +476,7 @@ def user_tables(con: sqlite3.Connection) -> dict[str, str]:
 
 
 def quote(name: str) -> str:
+    """An SQL identifier, quoted (URLs use url_quote)."""
     return '"' + name.replace('"', '""') + '"'
 
 
@@ -489,7 +491,7 @@ def stamp(path: Path) -> str:
 
 def said(text: str) -> str:
     """A document turn's text is the caption plus the document: the chat shows the caption and the file's name."""
-    m = re.match(r"(.*?)\n\n\[([^\]\n]+)\]\n", text, re.S)
+    m = re.match(r"(.*?)\n\n\[([^\]\n]+)\]\n", text, re.DOTALL)
     if not m:
         return text
     return f"📎 {m[2]}" + ("" if m[1] == DOCUMENT_REQUEST else f"\n{m[1]}")
